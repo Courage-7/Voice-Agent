@@ -1,7 +1,7 @@
 # Production Voice Agent
 ## Master Architecture and Developer Implementation Plan
 
-**Prepared for:** Project team  
+**Prepared for:** Courage  
 **Revision:** 3.1  
 **Date:** 26 July 2026  
 **Status:** Authoritative build prompt; implementation proceeds one tested increment at a time  
