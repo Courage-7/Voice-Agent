@@ -1,0 +1,7 @@
+from fastapi import FastAPI
+
+app = FastAPI(title="Voice AI Agent")
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
