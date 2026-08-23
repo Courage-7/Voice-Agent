@@ -219,6 +219,3 @@ PYTHONPATH=voice-agent pytest voice-agent/tests/ -v
 ```
 
 ---
-
-## License
-MIT License. Free for open-source and commercial use.
