@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice AI Agent Playground</title>
+    <style>
+        :root {
+            --bg-color: #07090e;
+            --card-bg: #0f1523;
+            --card-border: #1a2337;
+            --accent-primary: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --text-main: #f3f4f6;
+            --text-muted: #94a3b8;
+            --border-color: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 24px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title-area h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-area p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 3px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid var(--border-color);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status-connected { background: #064e3b; color: #a7f3d0; border-color: #059669; }
+        .status-listening { background: #1e3a8a; color: #bfdbfe; border-color: #2563eb; }
+        .status-speaking { background: #78350f; color: #fde68a; border-color: #d97706; }
+        .status-user_speaking { background: #581c87; color: #e9d5ff; border-color: #9333ea; }
+        .status-thinking { background: #831843; color: #fbcfe8; border-color: #db2777; }
+        .status-error { background: #7f1d1d; color: #fecaca; border-color: #dc2626; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 310px 1fr 340px;
+            gap: 18px;
+            flex: 1;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .main-grid.connectors-collapsed {
+            grid-template-columns: 310px 1fr 72px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            padding: 9px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+        .btn-secondary { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); }
+        .btn-secondary:hover:not(:disabled) { background: #334155; }
+        .btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 6px; }
+        .btn-icon { padding: 5px; border-radius: 6px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
+        .btn-icon:hover { background: #1e293b; color: var(--text-main); }
+
+        canvas#visualizer {
+            width: 100%;
+            height: 65px;
+            background: #080c14;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .text-input-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .text-input-row input {
+            flex: 1;
+            background: #080c14;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: var(--text-main);
+            font-size: 12px;
+            outline: none;
+        }
+
+        .text-input-row input:focus { border-color: var(--accent-primary); }
+
+        /* Unified Stream Feed */
+        .stream-feed {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 4px;
+            max-height: calc(100vh - 160px);
+        }
+
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .bubble-user {
+            background: #1e3a8a;
+            color: #dbeafe;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .bubble-assistant {
+            background: #192233;
+            color: #f1f5f9;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #222f47;
+        }
+
+        /* Sleek Trace Badge */
+        .trace-card {
+            align-self: center;
+            width: 96%;
+            background: #0b111d;
+            border: 1px solid #1e3a8a55;
+            border-left: 3px solid #3b82f6;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 11px;
+            color: #93c5fd;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .trace-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: 600;
+        }
+
+        .trace-tag {
+            font-size: 10px;
+            background: #1e3a8a88;
+            color: #93c5fd;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .trace-details {
+            font-family: monospace;
+            font-size: 10px;
+            color: #64748b;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: #060910;
+            padding: 4px 6px;
+            border-radius: 4px;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        /* Connectors Section */
+        .apps-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+            max-height: calc(100vh - 160px);
+        }
+
+        .app-item {
+            background: #0c121e;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 9px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            transition: border-color 0.2s ease;
+        }
+
+        .app-item.is-connected {
+            border-color: #065f46;
+            background: #08161e;
+        }
+
+        .app-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-icon {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background: #141c2c;
+            position: relative;
+        }
+
+        .app-icon .online-dot {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border: 2px solid #0f1523;
+            border-radius: 50%;
+        }
+
+        .app-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-info h4 {
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .app-info p {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Collapsed Connectors Mini Rail */
+        .connectors-mini-rail {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding-top: 6px;
+        }
+
+        .main-grid.connectors-collapsed .connectors-expanded-view {
+            display: none;
+        }
+
+        .main-grid.connectors-collapsed .connectors-mini-rail {
+            display: flex;
+        }
+
+        .mini-icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: #141c2c;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mini-icon-btn:hover {
+            border-color: var(--accent-primary);
+            background: #1e293b;
+        }
+
+        .mini-icon-btn.is-active {
+            border-color: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+        }
+
+        .mini-icon-btn .mini-dot {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            border: 2px solid #0f1523;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="title-area">
+            <h1>Voice AI Agent Playground</h1>
+            <p>Full-Duplex Deepgram Voice Agent + Groq LPU + LangGraph Brain + Connectors</p>
+        </div>
+        <div id="statusBadge" class="status-badge">Disconnected</div>
+    </header>
+
+    <div id="mainGrid" class="main-grid">
+        <!-- 1. Voice Controls -->
+        <div class="card">
+            <div class="card-header">
+                <span>Voice Controls</span>
+                <span id="sessionInfo" style="font-size: 11px; color: var(--text-muted);">Session: inactive</span>
+            </div>
+
+            <div class="controls-row">
+                <button id="startBtn" class="btn btn-primary" style="flex: 1;">Start Mic</button>
+                <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+            </div>
+
+            <canvas id="visualizer"></canvas>
+
+            <div class="card-header" style="margin-top: 6px;">
+                <span>Type Text Query</span>
+            </div>
+            <div class="text-input-row">
+                <label for="textInput" style="display:none;">Message input</label>
+                <input type="text" id="textInput" placeholder="Type query or speak into mic..." disabled>
+                <button id="sendBtn" class="btn btn-secondary" disabled>Send</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.4;">
+                Send injects text directly into the agent session while synthesizing spoken audio responses.
+            </div>
+        </div>
+
+        <!-- 2. Live Conversation Stream & Real-time Traces -->
+        <div class="card">
+            <div class="card-header">
+                <span>Conversation Stream</span>
+                <button id="clearBtn" class="btn btn-secondary btn-sm">Clear</button>
+            </div>
+
+            <div id="streamFeed" class="stream-feed">
+                <div class="bubble bubble-assistant">
+                    Click <strong>Start Mic</strong> to begin speaking with your assistant. Real-time actions and tools will trace seamlessly in this feed.
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Connectors Column -->
+        <div id="connectorsCard" class="card">
+            <!-- Expanded View Header -->
+            <div class="connectors-expanded-view card-header">
+                <span>Connectors</span>
+                <div style="display: flex; gap: 4px;">
+                    <button id="refreshAppsBtn" class="btn btn-secondary btn-sm">Refresh</button>
+                    <button id="toggleCollapseBtn" class="btn btn-icon btn-sm" title="Collapse panel">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Expanded App List -->
+            <div id="appsList" class="connectors-expanded-view apps-feed">
+                <!-- Dynamically populated and sorted by connection status -->
+            </div>
+
+            <!-- Collapsed Mini Rail -->
+            <div class="connectors-mini-rail">
+                <button id="expandConnectorsBtn" class="btn btn-icon btn-sm" title="Expand Connectors" style="margin-bottom: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <div id="miniAppsList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Mini icons with active dots -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let audioContext = null;
+        let micStream = null;
+        let processor = null;
+        let isConnected = false;
+        let isCollapsed = false;
+
+        const mainGrid = document.getElementById('mainGrid');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const textInput = document.getElementById('textInput');
+        const statusBadge = document.getElementById('statusBadge');
+        const sessionInfo = document.getElementById('sessionInfo');
+        const streamFeed = document.getElementById('streamFeed');
+        const appsList = document.getElementById('appsList');
+        const miniAppsList = document.getElementById('miniAppsList');
+        const clearBtn = document.getElementById('clearBtn');
+        const refreshAppsBtn = document.getElementById('refreshAppsBtn');
+        const toggleCollapseBtn = document.getElementById('toggleCollapseBtn');
+        const expandConnectorsBtn = document.getElementById('expandConnectorsBtn');
+        const canvas = document.getElementById('visualizer');
+        const canvasCtx = canvas.getContext('2d');
+
+        // Brand SVG Logos
+        const APP_ICONS = {
+            GMAIL: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`,
+            OUTLOOK: `<svg width="20" height="20" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0078D4"/><path fill="#FFF" d="M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm7-4.5V17a2 2 0 0 1-2 2H7l-4-3V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2.5z"/></svg>`,
+            GOOGLECALENDAR: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/><path fill="#34A853" d="M12 11h5v5h-5z"/></svg>`,
+            GOOGLESHEETS: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#0F9D58" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path fill="#0F9D58" d="M7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>`,
+            GOOGLEDOCS: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
+            GOOGLEDRIVE: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#FFC107" d="M8.5 3l4.5 7.8H4L1.7 6.4 8.5 3z"/><path fill="#2196F3" d="M22.3 15.6l-2.3 4H7l4.5-7.8h10.8z"/><path fill="#4CAF50" d="M13 10.8L8.5 3 4 10.8l4.5 7.8 4.5-7.8z"/></svg>`,
+            SERPAPI: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h5.9c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7c2.2-2 3.2-5 3.2-8.4z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3.3 0-6.1-2.2-7.1-5.3H1.1v2.9C3.1 20 7.2 23 12 23z"/><path fill="#FBBC05" d="M4.9 13.1c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3V5.6H1.1C.4 7 0 8.6 0 10.8s.4 3.8 1.1 5.2l3.8-2.9z"/><path fill="#EA4335" d="M12 4.4c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1 15.2 0 12 0 7.2 0 3.1 3 1.1 7l3.8 2.9c1-3.1 3.8-5.5 7.1-5.5z"/></svg>`,
+            PERPLEXITYAI: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#22D3EE" d="M12 2L9 7h6l-3-5zm0 20l3-5H9l3 5zm8-10l-5-3v6l5-3zM4 12l5 3V9L4 12z"/><circle cx="12" cy="12" r="3" fill="#06B6D4"/></svg>`,
+        };
+
+        function setCollapsed(collapsed) {
+            isCollapsed = collapsed;
+            if (collapsed) mainGrid.classList.add('connectors-collapsed');
+            else mainGrid.classList.remove('connectors-collapsed');
+        }
+
+        toggleCollapseBtn.onclick = () => setCollapsed(true);
+        expandConnectorsBtn.onclick = () => setCollapsed(false);
+
+        function updateStatus(state) {
+            statusBadge.className = 'status-badge status-' + state.toLowerCase();
+            statusBadge.textContent = state.replace('_', ' ');
+        }
+
+        function appendMessage(role, text) {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble bubble-' + (role === 'user' ? 'user' : 'assistant');
+            bubble.textContent = text;
+            streamFeed.appendChild(bubble);
+            streamFeed.scrollTop = streamFeed.scrollHeight;
+        }
+
+        function formatNaturalToolBrief(name, params) {
+            if (name === 'search_emails') {
+                const q = params.query ? ` for "${params.query}"` : '';
+                return `Searching emails${q}`;
+            } else if (name === 'send_email') {
+                return `Sending email to ${params.recipient || 'recipient'}`;
+            } else if (name === 'list_calendar_events') {
+                return 'Checking upcoming calendar events';
+            } else if (name === 'create_calendar_event') {
+                return `Scheduling "${params.title || 'Meeting'}"`;
+            } else if (name === 'get_current_time') {
+                return 'Checking current time';
+            } else if (name === 'end_voice_session') {
+                return 'Ending voice session';
+            } else if (name === 'web_search_serpapi' || name === 'SERPAPI_SEARCH') {
+                return `Searching the web for "${params.query || ''}"`;
+            } else if (name === 'execute_app_action') {
+                return `Executing ${params.intent || 'action'} on ${params.app_name || 'workspace'}`;
+            }
+            return `Executing ${name.replaceAll('_', ' ')}`;
+        }
+
+        let activeActivityCard = null;
+
+        function showEphemeralActivity(name, params) {
+            removeEphemeralActivity();
+            const brief = formatNaturalToolBrief(name, params);
+            const card = document.createElement('div');
+            card.className = 'trace-card';
+            card.id = 'ephemeralActivityIndicator';
+            card.innerHTML = `
+                <div class="trace-header">
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;animation:pulse 1s infinite;"></span>
+                        ${brief}...
+                    </span>
+                </div>
+            `;
+            streamFeed.appendChild(card);
+            streamFeed.scrollTop = streamFeed.scrollHeight;
+            activeActivityCard = card;
+        }
+
+        function removeEphemeralActivity() {
+            if (activeActivityCard) {
+                activeActivityCard.remove();
+            }
+            activeActivityCard = null;
+        }
+
+        clearBtn.onclick = () => {
+            removeEphemeralActivity();
+            streamFeed.innerHTML = '';
+        };
+
+        // Load Apps and Sort by Active Connections
+        async function loadApps() {
+            try {
+                const [appsRes, statusRes] = await Promise.all([
+                    fetch('/api/integrations/apps'),
+                    fetch('/api/integrations/status?user_id=web_user'),
+                ]);
+                const appsData = await appsRes.json();
+                const statusData = await statusRes.json();
+
+                const connectedMap = {};
+                (statusData.connected_accounts || []).forEach(acc => {
+                    if (acc.status === 'ACTIVE') {
+                        connectedMap[acc.app] = acc;
+                    }
+                });
+
+                // Order by active connections first
+                const sortedApps = [...appsData.apps].sort((a, b) => {
+                    const aConn = connectedMap[a.name] ? 1 : 0;
+                    const bConn = connectedMap[b.name] ? 1 : 0;
+                    return bConn - aConn;
+                });
+
+                appsList.innerHTML = '';
+                miniAppsList.innerHTML = '';
+
+                sortedApps.forEach(app => {
+                    const connected = connectedMap[app.name];
+                    const iconSvg = APP_ICONS[app.name] || `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#60a5fa"/></svg>`;
+                    
+                    // 1. Expanded App Card
+                    const item = document.createElement('div');
+                    item.className = `app-item ${connected ? 'is-connected' : ''}`;
+                    item.innerHTML = `
+                        <div class="app-left">
+                            <div class="app-icon">
+                                ${iconSvg}
+                                ${connected ? '<div class="online-dot"></div>' : ''}
+                            </div>
+                            <div class="app-info">
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <h4>${app.display_name}</h4>
+                                    ${connected ? '<span style="background:#064e3b;color:#6ee7b7;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;border:1px solid #10b981;">CONNECTED</span>' : ''}
+                                </div>
+                                <p>${app.description}</p>
+                            </div>
+                        </div>
+                        ${connected
+                            ? `<button class="btn btn-danger btn-sm" onclick="disconnectApp('${connected.id}')">Disconnect</button>`
+                            : `<button class="btn btn-secondary btn-sm" onclick="connectApp('${app.name}')">Connect</button>`
+                        }
+                    `;
+                    appsList.appendChild(item);
+
+                    // 2. Mini Rail Icon
+                    const miniBtn = document.createElement('div');
+                    miniBtn.className = `mini-icon-btn ${connected ? 'is-active' : ''}`;
+                    miniBtn.title = `${app.display_name} ${connected ? '(Connected)' : '(Click to connect)'}`;
+                    miniBtn.innerHTML = `
+                        ${iconSvg}
+                        ${connected ? '<div class="mini-dot"></div>' : ''}
+                    `;
+                    miniBtn.onclick = () => {
+                        if (connected) disconnectApp(connected.id);
+                        else connectApp(app.name);
+                    };
+                    miniAppsList.appendChild(miniBtn);
+                });
+            } catch (err) {
+                console.error('Failed to load apps:', err);
+                appsList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Failed to load connectors.</div>';
+            }
+        }
+
+        window.connectApp = async (appName) => {
+            try {
+                const res = await fetch(`/api/integrations/connect/${appName}?user_id=web_user`);
+                const data = await res.json();
+                if (data.redirect_url) {
+                    const popup = window.open(data.redirect_url, '_blank', 'width=600,height=700');
+                    const timer = setInterval(() => {
+                        if (!popup || popup.closed) {
+                            clearInterval(timer);
+                            void loadApps();
+                        }
+                    }, 1000);
+                } else {
+                    alert('Connection initiated: ' + (data.message || JSON.stringify(data)));
+                }
+            } catch (err) {
+                alert('OAuth initiation failed: ' + err);
+            }
+        };
+
+        window.disconnectApp = async (connectionId) => {
+            if (!confirm('Disconnect this connector?')) return;
+            try {
+                const res = await fetch(`/api/integrations/${connectionId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    void loadApps();
+                } else {
+                    alert('Disconnect failed: ' + (data.detail || data.error));
+                }
+            } catch (err) {
+                alert('Failed to disconnect: ' + err);
+            }
+        };
+
+        refreshAppsBtn.onclick = () => { void loadApps(); };
+        window.addEventListener('DOMContentLoaded', () => { void loadApps(); });
+
+        startBtn.onclick = async () => {
+            try {
+                // 1. Create session via REST API
+                const createRes = await fetch('/api/voice/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'web_user', persona: 'executive' }),
+                });
+                const sessionData = await createRes.json();
+                const sessionId = sessionData.session_id;
+
+                // 2. Connect WebSocket to the created session
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/api/voice/ws/${sessionId}?user_id=web_user`;
+
+                ws = new WebSocket(wsUrl);
+                ws.binaryType = 'arraybuffer';
+
+                ws.onopen = async () => {
+                    isConnected = true;
+                    updateStatus('CONNECTED');
+                    sessionInfo.textContent = 'Session: ' + sessionId.substring(0, 8);
+
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    sendBtn.disabled = false;
+                    textInput.disabled = false;
+
+                    await setupMicrophone();
+                };
+
+                ws.onmessage = async (event) => {
+                    if (event.data instanceof ArrayBuffer) {
+                        playAudioChunk(event.data);
+                    } else {
+                        const msg = JSON.parse(event.data);
+                        handleControlMessage(msg);
+                    }
+                };
+
+                ws.onclose = () => { stopSession(); };
+                ws.onerror = (err) => { console.error('WS Error:', err); stopSession(); };
+
+            } catch (err) {
+                alert('Microphone access or WebSocket connection failed: ' + err);
+            }
+        };
+
+        stopBtn.onclick = stopSession;
+
+        function stopSession() {
+            isConnected = false;
+            updateStatus('DISCONNECTED');
+            sessionInfo.textContent = 'Session: inactive';
+            stopAllAudioPlayback();
+            removeEphemeralActivity();
+
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+            if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+            if (processor) { processor.disconnect(); processor = null; }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            sendBtn.disabled = true;
+            textInput.disabled = true;
+        }
+
+        sendBtn.onclick = () => {
+            const text = textInput.value.trim();
+            if (text && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'InjectUserMessage', content: text }));
+                appendMessage('user', text);
+                textInput.value = '';
+            }
+        };
+
+        textInput.onkeydown = (e) => { if (e.key === 'Enter') sendBtn.click(); };
+
+        function handleControlMessage(msg) {
+            if (msg.type === 'SessionStateChange') {
+                updateStatus(msg.state);
+                if (msg.state === 'DISCONNECTED') {
+                    stopSession();
+                }
+            } else if (msg.type === 'ConversationText') {
+                removeEphemeralActivity();
+                if (msg.content && !msg.content.startsWith('Hi, please greet me')) {
+                    appendMessage(msg.role || 'assistant', msg.content);
+                }
+            } else if (msg.type === 'FunctionCallRequest') {
+                const fns = msg.functions || [{ name: msg.function_name || msg.name, arguments: msg.input || msg.parameters }];
+                if (fns.length > 0) {
+                    showEphemeralActivity(fns[0].name || 'Tool', fns[0].arguments || {});
+                }
+            } else if (msg.type === 'UserStartedSpeaking') {
+                updateStatus('USER_SPEAKING');
+                stopAllAudioPlayback(); // Instant barge-in: cancel all current audio nodes immediately!
+            } else if (msg.type === 'AgentThinking') {
+                updateStatus('THINKING');
+            } else if (msg.type === 'AgentStartedSpeaking') {
+                updateStatus('SPEAKING');
+            } else if (msg.type === 'AgentAudioDone') {
+                updateStatus('LISTENING');
+                removeEphemeralActivity();
+            }
+        }
+
+        async function setupMicrophone() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+
+            const source = audioContext.createMediaStreamSource(micStream);
+            processor = audioContext.createScriptProcessor(1024, 1, 1);
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+
+            processor.onaudioprocess = (e) => {
+                if (!isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(inputData.length);
+
+                for (let i = 0; i < inputData.length; i++) {
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+
+                ws.send(pcm16.buffer);
+                drawWaveform(inputData);
+            };
+        }
+
+        let playbackAudioContext = null;
+        let nextPlayTime = 0;
+        let activeAudioSources = [];
+
+        function stopAllAudioPlayback() {
+            activeAudioSources.forEach(source => {
+                try {
+                    source.stop();
+                    source.disconnect();
+                } catch (e) {}
+            });
+            activeAudioSources = [];
+            if (playbackAudioContext) {
+                nextPlayTime = playbackAudioContext.currentTime;
+            }
+        }
+
+        function playAudioChunk(arrayBuffer) {
+            if (!playbackAudioContext) {
+                playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            }
+            if (playbackAudioContext.state === 'suspended') {
+                void playbackAudioContext.resume();
+            }
+
+            const int16View = new Int16Array(arrayBuffer);
+            const float32Data = new Float32Array(int16View.length);
+            for (let i = 0; i < int16View.length; i++) {
+                float32Data[i] = int16View[i] / 32768.0;
+            }
+
+            const audioBuffer = playbackAudioContext.createBuffer(1, float32Data.length, 24000);
+            audioBuffer.getChannelData(0).set(float32Data);
+
+            const source = playbackAudioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(playbackAudioContext.destination);
+
+            const currentTime = playbackAudioContext.currentTime;
+            if (nextPlayTime < currentTime) nextPlayTime = currentTime;
+            source.start(nextPlayTime);
+            nextPlayTime += audioBuffer.duration;
+
+            activeAudioSources.push(source);
+            source.onended = () => {
+                const idx = activeAudioSources.indexOf(source);
+                if (idx !== -1) activeAudioSources.splice(idx, 1);
+            };
+        }
+
+        function drawWaveform(data) {
+            canvasCtx.fillStyle = '#080c14';
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = '#3b82f6';
+            canvasCtx.beginPath();
+
+            const sliceWidth = canvas.width * 1.0 / data.length;
+            let x = 0;
+
+            for (let i = 0; i < data.length; i += 8) {
+                const v = data[i] * 2;
+                const y = (canvas.height / 2) + (v * (canvas.height / 2));
+
+                if (i === 0) canvasCtx.moveTo(x, y);
+                else canvasCtx.lineTo(x, y);
+
+                x += sliceWidth * 8;
+            }
+
+            canvasCtx.stroke();
+        }
+    </script>
+</body>
+</html>

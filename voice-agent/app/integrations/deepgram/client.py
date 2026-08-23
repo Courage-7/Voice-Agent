@@ -1,4 +1,5 @@
-"""Client module.
+"""Deepgram client and factory."""
 
-TODO: implement according to the architecture plan.
-"""
+from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
+
+__all__ = ["DeepgramVoiceAgentSession"]
