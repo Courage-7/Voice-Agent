@@ -1,12 +1,18 @@
-from enum import StrEnum
+"""Real-time voice session state enumeration."""
 
-class SessionState(StrEnum):
+from enum import Enum
+
+
+class SessionState(str, Enum):
+    """Lifecycle state of a voice session."""
+
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
     LISTENING = "listening"
     USER_SPEAKING = "user_speaking"
-    ENDPOINT_DETECTED = "endpoint_detected"
     THINKING = "thinking"
     TOOL_EXECUTION = "tool_execution"
     SPEAKING = "speaking"
     INTERRUPTED = "interrupted"
-    CLOSED = "closed"
+    DISCONNECTED = "disconnected"
     ERROR = "error"
