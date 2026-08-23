@@ -7,7 +7,7 @@
 [![Composio](https://img.shields.io/badge/Composio-Tool%20Ecosystem-FF5722.svg)](https://composio.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Memory%20%26%20Vector-3ECF8E.svg)](https://supabase.com/)
 
-A production-grade, ultra-low-latency Voice AI Agent combining Deepgram's Voice Agent API (streaming Nova-2 STT and Aura TTS with native VAD and barge-in interruption), Groq LPU LLM Inference (llama-3.3-70b-versatile and llama-3.1-8b-instant), LangGraph Stateful Brain, Composio Tools Gateway, and Supabase Persistent Vector Memory.
+An ultra-low-latency Voice AI Agent combining Deepgram's Voice Agent API (streaming Nova-2 STT and Aura TTS with native VAD and barge-in interruption), Groq LPU LLM Inference (llama-3.3-70b-versatile and llama-3.1-8b-instant), LangGraph Stateful Brain, Composio Tools Gateway, and Supabase Persistent Vector Memory.
 
 ---
 
@@ -188,20 +188,13 @@ SUPABASE_KEY=your_supabase_key
 
 ### 4. Run the Application
 ```bash
-# Start server with uv
-uv run main.py
-
-# Or directly with uvicorn
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir voice-agent --reload
+# Start FastAPI server
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir voice-agent --reload
 ```
 
 Server endpoints will be available at:
-- Interactive Playground: `http://localhost:8000/`
-- Swagger UI (OpenAPI Docs): `http://localhost:8000/docs`
-- Health Check: `http://localhost:8000/api/health`
+- REST Health Check: `http://localhost:8000/health`
 - Tool Schemas: `http://localhost:8000/api/tools`
-- Composio OAuth Apps: `http://localhost:8000/api/integrations/apps`
-- Prometheus Metrics: `http://localhost:8000/api/metrics`
 - Voice WebSocket: `ws://localhost:8000/ws/agent?user_id=your_user_id`
 
 ---
