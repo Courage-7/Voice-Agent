@@ -9,6 +9,7 @@ from app.tools.email.tools import SearchEmailsTool, SendEmailTool
 from app.tools.memory.save_memory import SaveMemoryTool
 from app.tools.memory.search_memory import SearchMemoryTool
 from app.tools.search.tools import PerplexityResearchTool, SerpApiSearchTool
+from app.tools.system.complex_task import RunComplexTaskTool
 from app.tools.system.connected_apps import GetConnectedAppsTool
 from app.tools.system.current_time import CurrentTimeTool
 from app.tools.system.end_session import EndVoiceSessionTool
@@ -47,10 +48,20 @@ class ToolRegistry:
         caps_lower = {c.lower() for c in capabilities}
         return [t for t in self._tools.values() if t.capability.lower() in caps_lower or t.capability == "system"]
 
-    def get_deepgram_function_schemas(self, capabilities: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Export tool schemas formatted for Deepgram / Groq function calling, optionally scoped by capabilities."""
+    def get_deepgram_function_schemas(
+        self,
+        capabilities: Optional[List[str]] = None,
+        include_meta_tools: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Export tool schemas formatted for Deepgram / Groq function calling.
+
+        Excludes broad meta-tools like 'execute_app_action' by default to avoid semantic competition.
+        """
         tools = self.get_tools_for_capabilities(capabilities) if capabilities else self.get_all_tools()
-        return [tool.to_deepgram_function_schema() for tool in tools]
+        if not include_meta_tools:
+            # Exclude broad catch-all dynamic execution meta-tools from live Deepgram schemas
+            tools = [t for t in tools if t.name != "execute_app_action"]
+        return [t.to_deepgram_schema() for t in tools]
 
     def get_metadata_catalog(self) -> List[Dict[str, Any]]:
         """Export complete tool contract metadata for permission, audit, and routing."""
@@ -60,13 +71,16 @@ class ToolRegistry:
         self,
         tool_name: str,
         arguments: Dict[str, Any],
+        user_id: str = "default_user",
+        session_id: str = "",
         confirmed: bool = False,
-        **context: Any,
     ) -> Dict[str, Any]:
-        """Execute a tool by name with policy checks (confirmation, timeout, validation)."""
+        """Execute a tool with safety confirmation policies and user scoping."""
         tool = self.get_tool(tool_name)
+        context = {"user_id": user_id, "session_id": session_id, "confirmed": confirmed}
+
         if not tool:
-            logger.error(f"Attempted to execute unregistered tool: {tool_name}")
+            logger.warning(f"Attempted to execute unregistered tool '{tool_name}'")
             return {
                 "success": False,
                 "error": f"Tool '{tool_name}' is not recognized.",
@@ -123,6 +137,7 @@ class ToolRegistry:
         self.register(CurrentTimeTool())
         self.register(EndVoiceSessionTool())
         self.register(GetConnectedAppsTool())
+        self.register(RunComplexTaskTool())
         self.register(ExecuteAppActionTool())
         self.register(SendEmailTool())
         self.register(SearchEmailsTool())

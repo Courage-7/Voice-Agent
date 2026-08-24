@@ -39,3 +39,7 @@ class BaseTool(ABC):
             "description": self.description,
             "parameters": self.parameters,
         }
+
+    def to_deepgram_schema(self) -> Dict[str, Any]:
+        """Alias for to_deepgram_function_schema."""
+        return self.to_deepgram_function_schema()

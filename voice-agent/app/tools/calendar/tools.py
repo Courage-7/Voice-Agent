@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 from app.integrations.composio.client import composio_gateway
 from app.tools.base import BaseTool
+from app.tools.capability import capability_resolver
 
 
 def _extract_raw_events(raw_data: Any) -> List[Dict[str, Any]]:
@@ -21,17 +22,29 @@ def _extract_raw_events(raw_data: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _format_compact_events(raw_events: List[Dict[str, Any]], max_events: int) -> List[Dict[str, str]]:
-    """Format raw calendar events into compact dictionaries for LLM speech."""
-    compact_events: List[Dict[str, str]] = []
+def _format_compact_events(raw_events: List[Dict[str, Any]], max_events: int) -> List[Dict[str, Any]]:
+    """Format raw calendar events into compact dictionaries with identifiers for speech and multi-step planning."""
+    compact_events: List[Dict[str, Any]] = []
     for ev in raw_events[:max_events]:
+        event_id = str(ev.get("id") or ev.get("event_id") or ev.get("eventId") or "")
         title = str(ev.get("summary") or ev.get("title") or "Untitled Meeting")[:80]
         start_obj = ev.get("start", {})
         if isinstance(start_obj, dict):
             start_val = start_obj.get("dateTime") or start_obj.get("date") or "Scheduled"
         else:
             start_val = str(start_obj)
-        compact_events.append({"title": title, "start": str(start_val)[:40]})
+        end_obj = ev.get("end", {})
+        if isinstance(end_obj, dict):
+            end_val = end_obj.get("dateTime") or end_obj.get("date") or ""
+        else:
+            end_val = str(end_obj)
+
+        compact_events.append({
+            "event_id": event_id,
+            "title": title,
+            "start": str(start_val)[:40],
+            "end": str(end_val)[:40],
+        })
     return compact_events
 
 
@@ -56,7 +69,7 @@ class CreateCalendarEventTool(BaseTool):
                 "items": {"type": "string"},
                 "description": "Optional list of attendee email addresses.",
             },
-            "provider": {"type": "string", "enum": ["google", "outlook"], "description": "Calendar provider."},
+            "provider": {"type": "string", "enum": ["google", "outlook"], "description": "Optional calendar provider. If omitted, resolves automatically based on connected accounts."},
         },
         "required": ["title", "start_time"],
     }
@@ -67,11 +80,19 @@ class CreateCalendarEventTool(BaseTool):
         start_time: str,
         duration_minutes: int = 30,
         attendees: Optional[list] = None,
-        provider: str = "google",
+        provider: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
-        action_name = "GOOGLECALENDAR_CREATE_EVENT" if provider.lower() == "google" else "OUTLOOK_CREATE_EVENT"
+
+        # Resolve provider dynamically based on connected accounts
+        resolved_provider, disambiguation_error = await capability_resolver.resolve_calendar_provider(
+            user_id=user_id, requested_provider=provider
+        )
+        if disambiguation_error:
+            return disambiguation_error
+
+        action_name = "GOOGLECALENDAR_CREATE_EVENT" if resolved_provider == "google" else "OUTLOOK_CREATE_EVENT"
         params = {
             "summary": title,
             "start_time": start_time,
@@ -84,6 +105,7 @@ class CreateCalendarEventTool(BaseTool):
             return {
                 "success": True,
                 "spoken_summary": f"I have scheduled '{title}' for {start_time}.",
+                "provider": resolved_provider,
                 "event": res,
             }
         return {
@@ -109,7 +131,7 @@ class ListCalendarEventsTool(BaseTool):
             "time_min": {"type": "string", "description": "Start of search window in ISO 8601 or natural date."},
             "time_max": {"type": "string", "description": "End of search window in ISO 8601 or natural date."},
             "max_events": {"type": "integer", "description": "Maximum events to return. Defaults to 10."},
-            "provider": {"type": "string", "enum": ["google", "outlook"], "description": "Calendar provider."},
+            "provider": {"type": "string", "enum": ["google", "outlook"], "description": "Optional calendar provider. If omitted, resolves automatically based on connected accounts."},
         },
         "required": [],
     }
@@ -119,11 +141,19 @@ class ListCalendarEventsTool(BaseTool):
         time_min: Optional[str] = None,
         time_max: Optional[str] = None,
         max_events: int = 10,
-        provider: str = "google",
+        provider: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
-        action_name = "GOOGLECALENDAR_FIND_EVENT" if provider.lower() == "google" else "OUTLOOK_GET_CALENDAR_VIEW"
+
+        # Resolve provider dynamically based on connected accounts
+        resolved_provider, disambiguation_error = await capability_resolver.resolve_calendar_provider(
+            user_id=user_id, requested_provider=provider
+        )
+        if disambiguation_error:
+            return disambiguation_error
+
+        action_name = "GOOGLECALENDAR_FIND_EVENT" if resolved_provider == "google" else "OUTLOOK_GET_CALENDAR_VIEW"
         params: Dict[str, Any] = {}
         if time_min:
             params["time_min"] = time_min
@@ -155,5 +185,6 @@ class ListCalendarEventsTool(BaseTool):
             "success": True,
             "count": count,
             "spoken_summary": summary,
+            "provider": resolved_provider,
             "events": compact_events,
         }

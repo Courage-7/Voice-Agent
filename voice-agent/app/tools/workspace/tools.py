@@ -38,6 +38,7 @@ class GoogleSheetsTool(BaseTool):
         values: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
+        user_id = kwargs.get("user_id", "default_user")
         action_name = "GOOGLESHEETS_READ" if action == "read" else "GOOGLESHEETS_APPEND"
         params = {
             "spreadsheet_id": spreadsheet_id,
@@ -45,7 +46,13 @@ class GoogleSheetsTool(BaseTool):
             "values": values or [],
         }
 
-        res = await composio_gateway.execute_action(action_name, params)
+        res = await composio_gateway.execute_action(action_name, params, entity_id=user_id)
+        if not res.get("success"):
+            return {
+                "success": False,
+                "error": res.get("error", "Google Sheet operation failed"),
+                "spoken_summary": f"I was unable to {action} data on that Google Sheet.",
+            }
         return {
             "success": True,
             "spoken_summary": f"Google Sheet {action} operation completed.",
@@ -80,10 +87,17 @@ class GoogleDocsTool(BaseTool):
         document_id: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
+        user_id = kwargs.get("user_id", "default_user")
         action_name = "GOOGLEDOCS_CREATE" if not document_id else "GOOGLEDOCS_APPEND"
         params = {"title": title or "New Note", "content": content, "document_id": document_id}
 
-        res = await composio_gateway.execute_action(action_name, params)
+        res = await composio_gateway.execute_action(action_name, params, entity_id=user_id)
+        if not res.get("success"):
+            return {
+                "success": False,
+                "error": res.get("error", "Google Doc operation failed"),
+                "spoken_summary": "I was unable to update that Google Doc.",
+            }
         return {
             "success": True,
             "spoken_summary": "Google Doc updated successfully.",
@@ -111,7 +125,14 @@ class GoogleDriveTool(BaseTool):
     }
 
     async def execute(self, query: str, max_results: int = 5, **kwargs: Any) -> Dict[str, Any]:
-        res = await composio_gateway.execute_action("GOOGLEDRIVE_SEARCH", {"query": query, "max_results": max_results})
+        user_id = kwargs.get("user_id", "default_user")
+        res = await composio_gateway.execute_action("GOOGLEDRIVE_SEARCH", {"query": query, "max_results": max_results}, entity_id=user_id)
+        if not res.get("success"):
+            return {
+                "success": False,
+                "error": res.get("error", "Google Drive search failed"),
+                "spoken_summary": f"Unable to search Google Drive for '{query}'.",
+            }
         return {
             "success": True,
             "spoken_summary": f"Found matching files on Google Drive for '{query}'.",

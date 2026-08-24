@@ -1,8 +1,9 @@
 """Email tools: Gmail and Outlook integrations via Composio."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from app.integrations.composio.client import composio_gateway
 from app.tools.base import BaseTool
+from app.tools.capability import capability_resolver
 
 
 def _extract_raw_messages(raw_data: Any) -> List[Dict[str, Any]]:
@@ -21,14 +22,24 @@ def _extract_raw_messages(raw_data: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _format_compact_emails(raw_messages: List[Dict[str, Any]], max_results: int) -> List[Dict[str, str]]:
-    """Format raw email messages into compact dictionaries for LLM speech."""
-    compact_emails: List[Dict[str, str]] = []
+def _format_compact_emails(raw_messages: List[Dict[str, Any]], max_results: int) -> List[Dict[str, Any]]:
+    """Format raw email messages into compact dictionaries with message/thread identifiers for speech and multi-step actions."""
+    compact_emails: List[Dict[str, Any]] = []
     for msg in raw_messages[:max_results]:
+        msg_id = str(msg.get("id") or msg.get("message_id") or msg.get("messageId") or "")
+        thread_id = str(msg.get("threadId") or msg.get("thread_id") or "")
         sender = str(msg.get("sender") or msg.get("from") or "Unknown")[:60]
         subject = str(msg.get("subject") or "No subject")[:100]
-        preview = str(msg.get("preview") or msg.get("messageText") or msg.get("snippet") or "")[:120]
-        compact_emails.append({"sender": sender, "subject": subject, "preview": preview})
+        received_at = str(msg.get("date") or msg.get("received_at") or msg.get("timestamp") or "")[:30]
+        preview = str(msg.get("preview") or msg.get("messageText") or msg.get("snippet") or "")[:140]
+        compact_emails.append({
+            "message_id": msg_id,
+            "thread_id": thread_id,
+            "sender": sender,
+            "subject": subject,
+            "received_at": received_at,
+            "preview": preview,
+        })
     return compact_emails
 
 
@@ -51,7 +62,7 @@ class SendEmailTool(BaseTool):
             "provider": {
                 "type": "string",
                 "enum": ["gmail", "outlook"],
-                "description": "Email provider to use. Defaults to gmail.",
+                "description": "Optional email provider to use. If omitted, automatically resolves based on connected accounts.",
             },
         },
         "required": ["recipient", "subject", "body"],
@@ -62,11 +73,19 @@ class SendEmailTool(BaseTool):
         recipient: str,
         subject: str,
         body: str,
-        provider: str = "gmail",
+        provider: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
-        action_name = "GMAIL_SEND_EMAIL" if provider.lower() == "gmail" else "OUTLOOK_SEND_MAIL"
+
+        # Resolve provider dynamically based on connected accounts
+        resolved_provider, disambiguation_error = await capability_resolver.resolve_email_provider(
+            user_id=user_id, requested_provider=provider
+        )
+        if disambiguation_error:
+            return disambiguation_error
+
+        action_name = "GMAIL_SEND_EMAIL" if resolved_provider == "gmail" else "OUTLOOK_SEND_MAIL"
         params = {"recipient_email": recipient, "subject": subject, "body": body}
 
         res = await composio_gateway.execute_action(action_name, params, entity_id=user_id)
@@ -74,7 +93,7 @@ class SendEmailTool(BaseTool):
             return {
                 "success": True,
                 "spoken_summary": f"I have sent the email to {recipient} with the subject '{subject}'.",
-                "provider": provider,
+                "provider": resolved_provider,
                 "data": res,
             }
         return {
@@ -99,7 +118,7 @@ class SearchEmailsTool(BaseTool):
         "properties": {
             "query": {"type": "string", "description": "Search terms or keywords to locate."},
             "max_results": {"type": "integer", "description": "Maximum emails to retrieve. Default is 5."},
-            "provider": {"type": "string", "enum": ["gmail", "outlook"], "description": "Provider to search."},
+            "provider": {"type": "string", "enum": ["gmail", "outlook"], "description": "Optional provider. If omitted, resolves automatically based on connected accounts."},
         },
         "required": ["query"],
     }
@@ -108,11 +127,19 @@ class SearchEmailsTool(BaseTool):
         self,
         query: str,
         max_results: int = 5,
-        provider: str = "gmail",
+        provider: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
-        action_name = "GMAIL_FETCH_EMAILS" if provider.lower() == "gmail" else "OUTLOOK_GET_EMAILS"
+
+        # Resolve provider dynamically based on connected accounts
+        resolved_provider, disambiguation_error = await capability_resolver.resolve_email_provider(
+            user_id=user_id, requested_provider=provider
+        )
+        if disambiguation_error:
+            return disambiguation_error
+
+        action_name = "GMAIL_FETCH_EMAILS" if resolved_provider == "gmail" else "OUTLOOK_GET_EMAILS"
         params = {"query": query, "max_results": max_results}
 
         res = await composio_gateway.execute_action(action_name, params, entity_id=user_id)
@@ -138,5 +165,6 @@ class SearchEmailsTool(BaseTool):
             "success": True,
             "count": count,
             "spoken_summary": summary,
+            "provider": resolved_provider,
             "emails": compact_emails,
         }

@@ -28,6 +28,7 @@ class ComposioGateway:
         self.api_key = api_key or settings.composio_api_key
         self._client = None
         self._auth_configs_cache: Dict[str, str] = {}
+        self._user_sessions: Dict[str, Any] = {}
         self._initialize_client()
 
     def _initialize_client(self) -> None:
@@ -43,6 +44,53 @@ class ComposioGateway:
         except Exception:
             logger.exception("Failed to initialize Composio client")
             self._client = None
+
+    async def get_or_create_user_session(
+        self,
+        user_id: str,
+        toolkits: Optional[List[str]] = None,
+    ) -> Optional[Any]:
+        """Get or initialize a user-scoped Composio Session."""
+        if not self._client or not hasattr(self._client, "sessions"):
+            return None
+
+        if user_id in self._user_sessions:
+            return self._user_sessions[user_id]
+
+        try:
+            allowed_toolkits = toolkits or [
+                app["name"].lower().replace("_", "") for app in SUPPORTED_APPS
+            ]
+            session = await asyncio.to_thread(
+                self._client.sessions.create,
+                user_id=user_id,
+                toolkits=allowed_toolkits,
+            )
+            self._user_sessions[user_id] = session
+            logger.info(f"Initialized Composio Session for user '{user_id}' with toolkits: {allowed_toolkits}")
+            return session
+        except Exception:
+            logger.exception(f"Failed to create Composio Session for user '{user_id}'")
+            return None
+
+    async def discover_user_tools(self, user_id: str) -> List[Dict[str, Any]]:
+        """Dynamically discover available tools for a user from their Composio Session."""
+        session = await self.get_or_create_user_session(user_id)
+        if not session or not hasattr(session, "tools"):
+            return []
+
+        try:
+            tools = await asyncio.to_thread(session.tools)
+            discovered = []
+            for t in tools:
+                slug = getattr(t, "slug", getattr(t, "name", ""))
+                desc = getattr(t, "description", "")
+                params = getattr(t, "parameters", {})
+                discovered.append({"slug": slug, "description": desc, "parameters": params})
+            return discovered
+        except Exception:
+            logger.exception(f"Failed to discover tools for user '{user_id}'")
+            return []
 
     def _get_auth_config_id_sync(self, app_name: str) -> Optional[str]:
         """Resolve auth config ID for an app/toolkit slug."""

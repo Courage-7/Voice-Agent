@@ -53,6 +53,9 @@ INTENT_SLUG_MAP = {
 }
 
 
+WRITE_INTENTS = {"send", "create", "append", "update", "delete", "remove", "revoke"}
+
+
 class ExecuteAppActionTool(BaseTool):
     """Universal intent-driven tool to execute actions across connected workspace apps."""
 
@@ -63,7 +66,7 @@ class ExecuteAppActionTool(BaseTool):
     )
     capability = "workspace"
     read_only = False
-    requires_confirmation = False
+    requires_confirmation = False  # Checked dynamically at execution boundary based on resolved intent
     timeout_seconds = 20.0
 
     parameters = {
@@ -124,6 +127,21 @@ class ExecuteAppActionTool(BaseTool):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
+        confirmed = kwargs.get("confirmed", False)
+        intent_first_word = intent.lower().replace("_", " ").split()[0] if intent else ""
+
+        # Enforce execution boundary safety for dynamic write operations
+        if intent_first_word in WRITE_INTENTS and not confirmed:
+            logger.info(f"Dynamic App Action write intent '{intent}' requires verbal confirmation.")
+            return {
+                "success": False,
+                "requires_confirmation": True,
+                "app": app_name,
+                "intent": intent,
+                "parameters": parameters,
+                "spoken_summary": f"I am ready to {intent} on {app_name}. Would you like me to proceed?",
+            }
+
         slug = self._resolve_slug(app_name, intent)
         params = parameters or {}
 
