@@ -2,12 +2,14 @@
 
 import json
 import logging
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from app.conversations.service import conversation_service
 from app.realtime.session import RealtimeClientSession
+from app.voice.catalog import voice_catalog_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,14 +20,23 @@ _active_sessions: dict[str, RealtimeClientSession] = {}
 
 class CreateSessionRequest(BaseModel):
     user_id: str = "default_user"
-    persona: str = "executive"
+    persona: str = "companion"
+    voice_model: Optional[str] = None
 
 
 class SessionResponse(BaseModel):
     session_id: str
     user_id: str
     status: str
+    voice_model: Optional[str] = None
     message_count: int = 0
+
+
+@router.get("/voices")
+@router.get("/catalog")
+async def get_voice_catalog():
+    """List all available Deepgram Flux and Aura-2 TTS voices with metadata."""
+    return {"success": True, "voices": voice_catalog_service.get_catalog()}
 
 
 @router.post(
@@ -39,10 +50,16 @@ async def create_voice_session(payload: CreateSessionRequest):
     # Pre-register the conversation session so it exists before WS connect
     conversation_service.get_or_create_session(session_id, payload.user_id)
 
-    logger.info(f"Voice session created: {session_id} for user {payload.user_id}")
+    # Set user voice preference if provided
+    selected_voice = None
+    if payload.voice_model:
+        selected_voice = voice_catalog_service.set_user_voice(payload.user_id, payload.voice_model)
+
+    logger.info(f"Voice session created: {session_id} for user {payload.user_id} (voice: {selected_voice})")
     return SessionResponse(
         session_id=session_id,
         user_id=payload.user_id,
+        voice_model=selected_voice,
         status="created",
     )
 
@@ -60,10 +77,12 @@ async def get_voice_session(session_id: str):
 
     active = session_id in _active_sessions
     status = _active_sessions[session_id].state.value if active else "inactive"
+    voice_model = _active_sessions[session_id].voice_model if active else None
 
     return SessionResponse(
         session_id=session_id,
         user_id=conv.user_id,
+        voice_model=voice_model,
         status=status,
         message_count=len(conv.messages),
     )
@@ -94,11 +113,23 @@ async def voice_agent_websocket(
     websocket: WebSocket,
     session_id: str,
     user_id: str = Query(default="default_user"),
+    voice: Optional[str] = Query(default=None),
 ) -> None:
     """Full-duplex WebSocket connection for streaming audio and voice agent events."""
-    logger.info(f"WebSocket connection request: session_id={session_id}, user_id={user_id}")
+    logger.info(f"WebSocket connection request: session_id={session_id}, user_id={user_id}, voice={voice}")
 
-    session = RealtimeClientSession(session_id=session_id, client_ws=websocket, user_id=user_id)
+    # If user_id is default_user, check if session was registered with a specific user_id in conversation_service
+    if user_id == "default_user":
+        conv = conversation_service.get_session(session_id)
+        if conv and conv.user_id:
+            user_id = conv.user_id
+
+    session = RealtimeClientSession(
+        session_id=session_id,
+        client_ws=websocket,
+        user_id=user_id,
+        voice_model=voice,
+    )
     _active_sessions[session_id] = session
 
     await session.start()
