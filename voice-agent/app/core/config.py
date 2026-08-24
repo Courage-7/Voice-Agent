@@ -20,14 +20,18 @@ class Settings(BaseSettings):
     deepgram_api_key: str = ""
     deepgram_agent_ws_url: str = "wss://agent.deepgram.com/v1/agent/converse"
     deepgram_stt_model: str = "nova-2"
-    deepgram_tts_model: str = "aura-asteria-en"
+    deepgram_tts_model: str = "aura-2-thalia-en"
     input_sample_rate: int = 16000
     output_sample_rate: int = 24000
 
+    # Advanced Turn-Taking & Endpointing
+    deepgram_eot_threshold: float = 0.75
+    deepgram_eot_timeout_ms: int = 500
+
     # Groq LLM Inference (Ultra-low latency LPU)
     groq_api_key: str = ""
-    groq_model: str = "groq/compound"
-    groq_fast_model: str = "groq/compound-mini"
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_fast_model: str = "openai/gpt-oss-20b"
     groq_temperature: float = 0.3
     groq_max_tokens: int = 1024
 

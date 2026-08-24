@@ -416,6 +416,25 @@
 
             <canvas id="visualizer"></canvas>
 
+            <div class="card-header" style="margin-top: 10px;">
+                <span>Voice Model (Flux / Aura-2)</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <label for="voiceSelect" style="display:none;">TTS Voice Model</label>
+                <select id="voiceSelect" style="width: 100%; padding: 8px 10px; background: #0c121e; color: #f1f5f9; border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
+                    <option value="aura-2-thalia-en">Thalia (Aura-2 Female - Natural Companion)</option>
+                    <option value="aura-2-orion-en">Orion (Aura-2 Male - Professional Assistant)</option>
+                    <option value="aura-2-arcas-en">Arcas (Aura-2 Deep Male)</option>
+                    <option value="aura-2-perseus-en">Perseus (Aura-2 Energetic Male)</option>
+                    <option value="aura-2-angus-en">Angus (Aura-2 Irish Male)</option>
+                    <option value="aura-2-helios-en">Helios (Aura-2 British Male)</option>
+                    <option value="aura-2-zeus-en">Zeus (Aura-2 Resonant Male)</option>
+                    <option value="aura-asteria-en">Asteria (Aura-1 Classic)</option>
+                    <option value="aura-luna-en">Luna (Aura-1 Gentle)</option>
+                    <option value="aura-stella-en">Stella (Aura-1 Executive)</option>
+                </select>
+            </div>
+
             <div class="card-header" style="margin-top: 6px;">
                 <span>Type Text Query</span>
             </div>
@@ -486,6 +505,7 @@
         const stopBtn = document.getElementById('stopBtn');
         const sendBtn = document.getElementById('sendBtn');
         const textInput = document.getElementById('textInput');
+        const voiceSelect = document.getElementById('voiceSelect');
         const statusBadge = document.getElementById('statusBadge');
         const sessionInfo = document.getElementById('sessionInfo');
         const streamFeed = document.getElementById('streamFeed');
@@ -697,23 +717,69 @@
             }
         };
 
+        async function loadVoiceCatalog() {
+            try {
+                const res = await fetch('/api/voice/catalog');
+                const data = await res.json();
+                if (data.voices && data.voices.length > 0 && voiceSelect) {
+                    voiceSelect.innerHTML = '';
+                    data.voices.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = `${v.name} (${v.accent} ${v.gender})`;
+                        if (v.id === 'aura-2-thalia-en') opt.selected = true;
+                        voiceSelect.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.warn('Voice catalog fetch fallback:', e);
+            }
+        }
+
+        if (voiceSelect) {
+            voiceSelect.onchange = () => {
+                const newVoice = voiceSelect.value;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'UpdateSpeak',
+                        voice: newVoice,
+                    }));
+                }
+            };
+        }
+
         refreshAppsBtn.onclick = () => { void loadApps(); };
-        window.addEventListener('DOMContentLoaded', () => { void loadApps(); });
+        window.addEventListener('DOMContentLoaded', () => {
+            void loadApps();
+            void loadVoiceCatalog();
+        });
 
         startBtn.onclick = async () => {
             try {
+                const selectedVoice = voiceSelect ? voiceSelect.value : 'aura-2-thalia-en';
+
+                // Initialize playback audio context on user gesture
+                if (!playbackAudioContext) {
+                    playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                }
+                if (playbackAudioContext.state === 'suspended') {
+                    await playbackAudioContext.resume();
+                }
+                nextPlayTime = playbackAudioContext.currentTime;
+                playbackSuppressed = false;
+
                 // 1. Create session via REST API
                 const createRes = await fetch('/api/voice/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: 'web_user', persona: 'executive' }),
+                    body: JSON.stringify({ user_id: 'web_user', persona: 'companion', voice_model: selectedVoice }),
                 });
                 const sessionData = await createRes.json();
                 const sessionId = sessionData.session_id;
 
-                // 2. Connect WebSocket to the created session
+                // 2. Connect WebSocket to the created session with selected voice
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/api/voice/ws/${sessionId}?user_id=web_user`;
+                const wsUrl = `${protocol}//${window.location.host}/api/voice/ws/${sessionId}?user_id=web_user&voice=${encodeURIComponent(selectedVoice)}`;
 
                 ws = new WebSocket(wsUrl);
                 ws.binaryType = 'arraybuffer';
@@ -750,8 +816,16 @@
 
         stopBtn.onclick = stopSession;
 
+        let playbackSuppressed = false;
+        let isAgentSpeaking = false;
+        let playbackAudioContext = null;
+        let nextPlayTime = 0;
+        let activeAudioSources = [];
+
         function stopSession() {
             isConnected = false;
+            playbackSuppressed = false;
+            isAgentSpeaking = false;
             updateStatus('DISCONNECTED');
             sessionInfo.textContent = 'Session: inactive';
             stopAllAudioPlayback();
@@ -770,6 +844,12 @@
         sendBtn.onclick = () => {
             const text = textInput.value.trim();
             if (text && ws && ws.readyState === WebSocket.OPEN) {
+                // Typed Interruption: If agent is speaking or playback is active, stop and suppress old audio
+                if (isAgentSpeaking || activeAudioSources.length > 0) {
+                    stopAllAudioPlayback();
+                    playbackSuppressed = false;
+                    isAgentSpeaking = false;
+                }
                 ws.send(JSON.stringify({ type: 'InjectUserMessage', content: text }));
                 appendMessage('user', text);
                 textInput.value = '';
@@ -789,6 +869,9 @@
                 if (msg.content && !msg.content.startsWith('Hi, please greet me')) {
                     appendMessage(msg.role || 'assistant', msg.content);
                 }
+                if (msg.role === 'assistant') {
+                    playbackSuppressed = false;
+                }
             } else if (msg.type === 'FunctionCallRequest') {
                 const fns = msg.functions || [{ name: msg.function_name || msg.name, arguments: msg.input || msg.parameters }];
                 if (fns.length > 0) {
@@ -796,14 +879,24 @@
                 }
             } else if (msg.type === 'UserStartedSpeaking') {
                 updateStatus('USER_SPEAKING');
+                isAgentSpeaking = false;
                 stopAllAudioPlayback(); // Instant barge-in: cancel all current audio nodes immediately!
+                playbackSuppressed = true; // Drop late in-flight PCM frames from previous turn
             } else if (msg.type === 'AgentThinking') {
                 updateStatus('THINKING');
+                isAgentSpeaking = false;
+                playbackSuppressed = false; // User finished turn, allow new answer audio
             } else if (msg.type === 'AgentStartedSpeaking') {
                 updateStatus('SPEAKING');
+                isAgentSpeaking = true;
+                playbackSuppressed = false;
             } else if (msg.type === 'AgentAudioDone') {
                 updateStatus('LISTENING');
+                isAgentSpeaking = false;
+                playbackSuppressed = false;
                 removeEphemeralActivity();
+            } else if (msg.type === 'LatencyReport') {
+                console.log('Deepgram LatencyReport telemetry:', msg);
             }
         }
 
@@ -813,7 +906,15 @@
                 await audioContext.resume();
             }
 
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    channelCount: 1,
+                    sampleRate: 16000,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
+            });
 
             const source = audioContext.createMediaStreamSource(micStream);
             processor = audioContext.createScriptProcessor(1024, 1, 1);
@@ -837,10 +938,6 @@
             };
         }
 
-        let playbackAudioContext = null;
-        let nextPlayTime = 0;
-        let activeAudioSources = [];
-
         function stopAllAudioPlayback() {
             activeAudioSources.forEach(source => {
                 try {
@@ -855,6 +952,10 @@
         }
 
         function playAudioChunk(arrayBuffer) {
+            if (playbackSuppressed) {
+                return;
+            }
+
             if (!playbackAudioContext) {
                 playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
             }
@@ -863,6 +964,8 @@
             }
 
             const int16View = new Int16Array(arrayBuffer);
+            if (int16View.length === 0) return;
+
             const float32Data = new Float32Array(int16View.length);
             for (let i = 0; i < int16View.length; i++) {
                 float32Data[i] = int16View[i] / 32768.0;
@@ -876,7 +979,9 @@
             source.connect(playbackAudioContext.destination);
 
             const currentTime = playbackAudioContext.currentTime;
-            if (nextPlayTime < currentTime) nextPlayTime = currentTime;
+            if (nextPlayTime < currentTime) {
+                nextPlayTime = currentTime;
+            }
             source.start(nextPlayTime);
             nextPlayTime += audioBuffer.duration;
 

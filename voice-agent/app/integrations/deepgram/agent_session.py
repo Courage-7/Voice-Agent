@@ -9,7 +9,11 @@ import websockets
 from app.agent.persona.service import persona_service
 from app.conversations.service import conversation_service
 from app.core.config import settings
+from app.memory.service import memory_service
+from app.observability.metrics import metrics_collector
 from app.tools.registry import tool_registry
+from app.users.service import user_service
+from app.voice.catalog import voice_catalog_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +25,21 @@ class DeepgramVoiceAgentSession:
         self,
         session_id: str,
         user_id: str = "default_user",
+        voice_model: Optional[str] = None,
         on_audio_chunk: Optional[Callable[[bytes], Coroutine[Any, Any, None]]] = None,
         on_event: Optional[Callable[[Dict[str, Any]], Coroutine[Any, Any, None]]] = None,
     ) -> None:
         self.session_id = session_id
         self.user_id = user_id
+        self.voice_model = voice_model
         self.on_audio_chunk = on_audio_chunk
         self.on_event = on_event
 
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self._listen_task: Optional[asyncio.Task] = None
         self._is_running = False
+        self._is_agent_speaking = False
+        self._last_assistant_turn_interrupted = False
 
     async def connect(self) -> bool:
         """Establish WebSocket connection to Deepgram Voice Agent API."""
@@ -61,12 +69,67 @@ class DeepgramVoiceAgentSession:
             return False
 
     async def _send_settings_configuration(self) -> None:
-        """Send the initial Settings payload specifying Groq + Nova-2 + Aura + Tools."""
-        instructions = persona_service.get_voice_instructions(user_context=f"User ID: {self.user_id}")
+        """Send the initial Settings payload specifying Groq + Nova-2 + Flux/Aura-2 TTS + Memory + Tools."""
+        # 1. Fetch user context & bounded memories safely
+        memory_summary = ""
+        user_context_str = f"User ID: {self.user_id}"
+        try:
+            memory_summary = await memory_service.get_user_memory_summary(self.user_id, limit=5)
+        except Exception as e:
+            logger.warning(f"[{self.session_id}] Could not fetch user memory summary: {e}")
+
+        try:
+            profile = await user_service.get_or_create_user(self.user_id)
+            if profile and profile.full_name and profile.full_name != "User":
+                user_context_str = f"User Name: {profile.full_name}\nUser ID: {self.user_id}"
+        except Exception as e:
+            logger.warning(f"[{self.session_id}] Could not fetch user profile: {e}")
+
+        instructions = persona_service.get_voice_instructions(
+            user_context=user_context_str,
+            memory_context=memory_summary,
+        )
         functions = tool_registry.get_deepgram_function_schemas()
 
-        # Groq model supported by Deepgram Voice Agent API think provider
-        groq_think_model = "openai/gpt-oss-20b"
+        # Resolve active TTS voice (respecting session override, user preference, or system default)
+        active_voice = voice_catalog_service.validate_voice(
+            self.voice_model or voice_catalog_service.get_user_voice(self.user_id, settings.deepgram_tts_model)
+        )
+        self.voice_model = active_voice
+
+        # Resolve Groq model ID for Deepgram Voice Agent think provider
+        groq_model_name = settings.groq_model
+        if "compound" in groq_model_name.lower() or not groq_model_name:
+            groq_think_model = "llama-3.3-70b-versatile"
+        elif groq_model_name.startswith("groq/"):
+            groq_think_model = groq_model_name.replace("groq/", "")
+        else:
+            groq_think_model = groq_model_name
+
+        listen_provider: Dict[str, Any] = {
+            "type": "deepgram",
+            "model": settings.deepgram_stt_model,
+        }
+        if "flux" in settings.deepgram_stt_model.lower():
+            listen_provider["eot_threshold"] = settings.deepgram_eot_threshold
+            listen_provider["eot_timeout_ms"] = settings.deepgram_eot_timeout_ms
+
+        think_payload: Dict[str, Any] = {
+            "provider": {
+                "type": "groq",
+                "model": groq_think_model,
+                "temperature": settings.groq_temperature,
+            },
+            "prompt": instructions,
+            "functions": functions,
+        }
+        if settings.groq_api_key:
+            think_payload["endpoint"] = {
+                "url": "https://api.groq.com/openai/v1/chat/completions",
+                "headers": {
+                    "Authorization": f"Bearer {settings.groq_api_key}",
+                },
+            }
 
         config_payload = {
             "type": "Settings",
@@ -81,30 +144,29 @@ class DeepgramVoiceAgentSession:
                 },
             },
             "agent": {
+                "greeting": "Hello! I'm here and ready to help.",
                 "listen": {
-                    "provider": {
-                        "type": "deepgram",
-                        "model": settings.deepgram_stt_model,
-                    }
+                    "provider": listen_provider,
                 },
-                "think": {
-                    "provider": {
-                        "type": "groq",
-                        "model": groq_think_model,
-                    },
-                    "prompt": instructions,
-                    "functions": functions,
-                },
+                "think": think_payload,
                 "speak": {
                     "provider": {
                         "type": "deepgram",
-                        "model": settings.deepgram_tts_model,
+                        "model": active_voice,
                     }
                 },
             },
         }
 
-        logger.info(f"[{self.session_id}] Sending Settings to Deepgram (Groq model '{groq_think_model}', {len(functions)} tools).")
+        think_cfg = config_payload["agent"]["think"]
+        logger.info(
+            f"[{self.session_id}] Sending Settings to Deepgram (TTS voice '{active_voice}', Groq model '{groq_think_model}', {len(functions)} tools, endpointing={settings.deepgram_eot_threshold}/{settings.deepgram_eot_timeout_ms}ms)."
+        )
+        logger.info(
+            f"[{self.session_id}] Deepgram Think configuration: provider.type={think_cfg.get('provider', {}).get('type')}, "
+            f"provider.model={think_cfg.get('provider', {}).get('model')}, endpoint={think_cfg.get('provider', {}).get('endpoint', 'DEFAULT')}, "
+            f"functions_count={len(functions)}"
+        )
         await self.ws.send(json.dumps(config_payload))
 
     async def send_audio(self, audio_data: bytes) -> None:
@@ -127,12 +189,31 @@ class DeepgramVoiceAgentSession:
             payload = {"type": "UpdatePrompt", "prompt": new_instructions}
             await self.ws.send(json.dumps(payload))
 
+    async def update_speak(self, voice_model: str) -> None:
+        """Dynamically update agent voice model mid-session."""
+        validated = voice_catalog_service.validate_voice(voice_model)
+        self.voice_model = validated
+        voice_catalog_service.set_user_voice(self.user_id, validated)
+
+        if self.ws and self._is_running:
+            payload = {
+                "type": "UpdateSpeak",
+                "speak": {
+                    "provider": {
+                        "type": "deepgram",
+                        "model": validated,
+                    }
+                },
+            }
+            logger.info(f"[{self.session_id}] Sending UpdateSpeak to Deepgram with voice '{validated}'")
+            await self.ws.send(json.dumps(payload))
+
     async def _receive_loop(self) -> None:
         """Continuous receive loop for Deepgram audio frames and JSON control messages."""
         try:
             async for message in self.ws:
                 if isinstance(message, bytes):
-                    # Audio chunk from Deepgram Aura TTS
+                    # Audio chunk from Deepgram Aura/Flux TTS
                     if self.on_audio_chunk:
                         await self.on_audio_chunk(message)
                 else:
@@ -152,33 +233,69 @@ class DeepgramVoiceAgentSession:
         event_type = event.get("type", "Unknown")
         logger.debug(f"[{self.session_id}] Received Deepgram event: {event_type}")
 
-        # 1. Tool / Function Call Execution
+        # 1. Track Agent Speaking State for Interruption Detection
+        if event_type == "AgentStartedSpeaking":
+            self._is_agent_speaking = True
+            self._last_assistant_turn_interrupted = False
+        elif event_type == "AgentAudioDone":
+            self._is_agent_speaking = False
+        elif event_type == "UserStartedSpeaking":
+            if self._is_agent_speaking:
+                self._last_assistant_turn_interrupted = True
+                self._is_agent_speaking = False
+                logger.info(f"[{self.session_id}] User interrupted agent speech turn.")
+
+        # 2. Tool / Function Call Execution
         if event_type == "FunctionCallRequest":
             await self._handle_function_call(event)
 
-        # 2. Settings Applied -> Trigger Instant Spoken Greeting
+        # 3. Settings Applied -> Native greeting handles voice startup
         elif event_type == "SettingsApplied":
-            logger.info(f"[{self.session_id}] Settings applied. Triggering instant spoken greeting.")
-            greeting_payload = {
-                "type": "InjectAgentMessage",
-                "content": "Hello! I'm here and ready to help.",
-            }
-            if self.ws and self._is_running:
-                await self.ws.send(json.dumps(greeting_payload))
+            logger.info(f"[{self.session_id}] Settings applied successfully by Deepgram Voice Agent.")
 
-        # 3. Conversation Transcript Logging
+        # 4. Dynamic Speak / Voice Update Confirmation
+        elif event_type == "SpeakUpdated":
+            speak_data = event.get("speak") or event
+            logger.info(f"[{self.session_id}] Deepgram SpeakUpdated confirmed: {speak_data}")
+
+        # 5. Latency Telemetry Report
+        elif event_type == "LatencyReport":
+            stt = event.get("stt_latency")
+            ttft = event.get("ttt_token_latency") or event.get("ttft")
+            text_lat = event.get("ttt_text_latency")
+            tool_lat = event.get("ttt_tool_latency")
+            tts = event.get("tts_latency")
+            total = event.get("total_latency")
+            logger.info(
+                f"[{self.session_id}] Deepgram LatencyReport: total={total}ms, stt={stt}ms, "
+                f"ttft={ttft}ms, text={text_lat}ms, tool={tool_lat}ms, tts={tts}ms"
+            )
+            metrics_collector.record_latency(stt=stt, ttft=ttft, tts=tts, total=total)
+
+        # 6. Warnings and Errors
+        elif event_type == "Warning":
+            logger.warning(f"[{self.session_id}] Deepgram Warning event: {event.get('message') or event}")
+        elif event_type == "Error":
+            logger.error(f"[{self.session_id}] Deepgram Error event: {event.get('message') or event}")
+
+        # 7. Conversation Transcript Logging with Interruption Metadata
         elif event_type == "ConversationText":
             role = event.get("role", "assistant")
             content = event.get("content", "")
             if content:
+                meta: Dict[str, Any] = {}
+                if role == "assistant" and self._last_assistant_turn_interrupted:
+                    meta["interrupted"] = True
+                    self._last_assistant_turn_interrupted = False
                 await conversation_service.log_message(
                     session_id=self.session_id,
                     role=role,
                     content=content,
                     user_id=self.user_id,
+                    metadata=meta,
                 )
 
-        # 4. Forward event to Client WebSocket if callback registered
+        # 8. Forward event to Client WebSocket if callback registered
         if self.on_event:
             await self.on_event(event)
 

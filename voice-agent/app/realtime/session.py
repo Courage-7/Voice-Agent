@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import WebSocket
 from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
+from app.observability.metrics import metrics_collector
 from app.realtime.state import SessionState
 
 logger = logging.getLogger(__name__)
@@ -15,16 +16,24 @@ logger = logging.getLogger(__name__)
 class RealtimeClientSession:
     """Coordinates full-duplex streaming between the Client WebSocket and Deepgram Agent."""
 
-    def __init__(self, session_id: str, client_ws: WebSocket, user_id: str = "default_user") -> None:
+    def __init__(
+        self,
+        session_id: str,
+        client_ws: WebSocket,
+        user_id: str = "default_user",
+        voice_model: Optional[str] = None,
+    ) -> None:
         self.session_id = session_id
         self.client_ws = client_ws
         self.user_id = user_id
+        self.voice_model = voice_model
         self.state = SessionState.CONNECTING
 
         # Backend Deepgram Session
         self.deepgram_session = DeepgramVoiceAgentSession(
             session_id=session_id,
             user_id=user_id,
+            voice_model=voice_model,
             on_audio_chunk=self._forward_audio_to_client,
             on_event=self._forward_event_to_client,
         )
@@ -33,6 +42,7 @@ class RealtimeClientSession:
         """Start the session and connect to Deepgram."""
         await self.client_ws.accept()
         self.state = SessionState.CONNECTED
+        metrics_collector.increment_session()
         await self._send_state_update()
 
         connected = await self.deepgram_session.connect()
@@ -69,6 +79,15 @@ class RealtimeClientSession:
             prompt = event.get("prompt", "")
             if prompt:
                 await self.deepgram_session.update_prompt(prompt)
+        elif event_type in ("UpdateSpeak", "ChangeVoice"):
+            voice = (
+                event.get("voice")
+                or event.get("model")
+                or event.get("voice_model")
+                or (event.get("speak", {}).get("provider", {}).get("model"))
+            )
+            if voice:
+                await self.deepgram_session.update_speak(voice)
 
     async def _forward_audio_to_client(self, audio_chunk: bytes) -> None:
         """Stream raw synthesized audio frame to client speaker."""
@@ -88,6 +107,10 @@ class RealtimeClientSession:
             self.state = SessionState.SPEAKING
         elif event_type == "AgentAudioDone":
             self.state = SessionState.LISTENING
+            metrics_collector.record_turn()
+        elif event_type == "FunctionCallRequest":
+            tool_name = event.get("function_name") or event.get("name") or "unknown_tool"
+            metrics_collector.record_tool_call(tool_name)
 
         await self._send_json_message(event)
 
@@ -102,6 +125,8 @@ class RealtimeClientSession:
 
     async def close(self) -> None:
         """Clean up on client disconnect."""
+        if self.state != SessionState.DISCONNECTED:
+            metrics_collector.decrement_session()
         self.state = SessionState.DISCONNECTED
         await self.deepgram_session.close()
         logger.info(f"[{self.session_id}] Realtime Client Session ended.")
