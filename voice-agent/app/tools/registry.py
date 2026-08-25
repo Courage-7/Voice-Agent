@@ -32,8 +32,20 @@ class ToolRegistry:
         logger.debug(f"Registered tool: {tool.name} (capability={tool.capability}, read_only={tool.read_only})")
 
     def get_tool(self, name: str) -> Optional[BaseTool]:
-        """Retrieve a registered tool by name."""
-        return self._tools.get(name)
+        """Retrieve a registered tool by name, handling common model aliases."""
+        tool = self._tools.get(name)
+        if not tool:
+            aliases = {
+                "save_memory": "save_user_memory",
+                "search_memory": "search_user_memory",
+                "get_time": "get_current_time",
+                "time": "get_current_time",
+                "search_email": "search_emails",
+                "send_emails": "send_email",
+            }
+            if name in aliases:
+                tool = self._tools.get(aliases[name])
+        return tool
 
     def get_all_tools(self) -> List[BaseTool]:
         """Get list of all registered tools."""
