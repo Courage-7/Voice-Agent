@@ -3,781 +3,1478 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI Agent Playground</title>
+    <title>AETHERIS · Quantum Neural Voice Interface</title>
+    
+    <!-- Cyber Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Three.js (WebGL 3D Core) & GSAP Animation Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
     <style>
         :root {
-            --bg-color: #07090e;
-            --card-bg: #0f1523;
-            --card-border: #1a2337;
-            --accent-primary: #3b82f6;
-            --accent-green: #10b981;
-            --accent-red: #ef4444;
-            --accent-yellow: #f59e0b;
-            --text-main: #f3f4f6;
-            --text-muted: #94a3b8;
-            --border-color: #1e293b;
+            --void-black: #020408;
+            --carbon-base: #050a14;
+            --glass-surface: rgba(8, 16, 32, 0.65);
+            --glass-surface-hover: rgba(12, 24, 48, 0.82);
+            --glass-border: rgba(0, 240, 255, 0.16);
+            --glass-border-bright: rgba(0, 240, 255, 0.45);
+            --glass-inner-bevel: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+            
+            --neon-cyan: #00F0FF;
+            --cyan-glow: 0 0 24px rgba(0, 240, 255, 0.5);
+            --cyan-dim: rgba(0, 240, 255, 0.1);
+            
+            --plasma-violet: #A855F7;
+            --plasma-glow: 0 0 24px rgba(168, 85, 247, 0.5);
+            --plasma-dim: rgba(168, 85, 247, 0.12);
+            
+            --cyber-emerald: #00FF9D;
+            --emerald-glow: 0 0 24px rgba(0, 255, 157, 0.5);
+            
+            --solar-amber: #F59E0B;
+            --amber-glow: 0 0 24px rgba(245, 158, 11, 0.5);
+            
+            --crimson-alert: #FF3366;
+            --crimson-glow: 0 0 24px rgba(255, 51, 102, 0.5);
+
+            --text-pure: #FFFFFF;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
+            --text-tertiary: #475569;
+
+            --font-display: 'Syne', -apple-system, sans-serif;
+            --font-ui: 'Space Grotesk', -apple-system, sans-serif;
+            --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            user-select: none;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px 24px;
+            background-color: var(--void-black);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            position: relative;
         }
 
-        header {
+        /* 3D WebGL Canvas Layer */
+        #viewport3d {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            cursor: grab;
+        }
+
+        #viewport3d:active {
+            cursor: grabbing;
+        }
+
+        /* Ambient Sci-Fi Vignette & Hex HUD Grid */
+        .hud-vignette {
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 50% 50%, transparent 40%, rgba(2, 4, 8, 0.85) 100%),
+                linear-gradient(rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 60px 60px, 60px 60px;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Master Spatial HUD Layer */
+        .spatial-hud {
+            position: relative;
+            z-index: 3;
+            height: 100vh;
+            width: 100vw;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            padding: 20px 28px 24px 28px;
+            pointer-events: none;
+        }
+
+        .spatial-hud > * {
+            pointer-events: auto;
+        }
+
+        /* 1. TOP FLOATING NAVIGATION CAPSULE */
+        header.cyber-nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .title-area h1 {
-            font-size: 22px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .title-area p {
-            color: var(--text-muted);
-            font-size: 13px;
-            margin-top: 3px;
-        }
-
-        .status-badge {
-            padding: 5px 12px;
+            padding: 12px 24px;
+            background: var(--glass-surface);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid var(--glass-border);
             border-radius: 9999px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            background: #1e293b;
-            color: #cbd5e1;
-            border: 1px solid var(--border-color);
-            display: inline-flex;
+            box-shadow: var(--glass-inner-bevel), 0 16px 40px rgba(0, 0, 0, 0.6);
+            transition: all 0.4s var(--ease-fluid);
+        }
+
+        header.cyber-nav:hover {
+            border-color: var(--glass-border-bright);
+            box-shadow: var(--glass-inner-bevel), 0 20px 50px rgba(0, 240, 255, 0.1);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-core-glyph {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--neon-cyan) 0%, rgba(0, 240, 255, 0.1) 70%);
+            border: 1px solid var(--neon-cyan);
+            box-shadow: var(--cyan-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--void-black);
+            position: relative;
+        }
+
+        .brand-core-glyph::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 1px dashed rgba(0, 240, 255, 0.4);
+            border-radius: 50%;
+            animation: rotateGlyph 12s linear infinite;
+        }
+
+        @keyframes rotateGlyph {
+            to { transform: rotate(360deg); }
+        }
+
+        .brand-text-block {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-title {
+            font-family: var(--font-display);
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: var(--text-pure);
+            display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        .status-badge::before {
-            content: '';
-            width: 7px;
-            height: 7px;
+        .brand-subtitle {
+            font-family: var(--font-mono);
+            font-size: 9.5px;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Top Nav Telemetry Pills */
+        .nav-center-telemetry {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .telemetry-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: rgba(4, 8, 16, 0.5);
+            padding: 5px 12px;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .telemetry-chip svg {
+            color: var(--neon-cyan);
+        }
+
+        .telemetry-chip span.val {
+            color: var(--neon-cyan);
+            font-weight: 700;
+        }
+
+        .nav-right-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Quantum State Indicator */
+        .state-indicator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: rgba(3, 7, 18, 0.8);
+            border: 1px solid var(--text-tertiary);
+            color: var(--text-secondary);
+            transition: all 0.3s var(--ease-fluid);
+        }
+
+        .state-indicator-badge .state-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: currentColor;
+            box-shadow: 0 0 10px currentColor;
+            position: relative;
         }
 
-        .status-connected { background: #064e3b; color: #a7f3d0; border-color: #059669; }
-        .status-listening { background: #1e3a8a; color: #bfdbfe; border-color: #2563eb; }
-        .status-speaking { background: #78350f; color: #fde68a; border-color: #d97706; }
-        .status-user_speaking { background: #581c87; color: #e9d5ff; border-color: #9333ea; }
-        .status-thinking { background: #831843; color: #fbcfe8; border-color: #db2777; }
-        .status-error { background: #7f1d1d; color: #fecaca; border-color: #dc2626; }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 310px 1fr 340px;
-            gap: 18px;
-            flex: 1;
-            transition: grid-template-columns 0.3s ease;
+        .state-indicator-badge .state-dot::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1px solid currentColor;
+            opacity: 0.7;
+            animation: pingRing 2s infinite cubic-bezier(0, 0, 0.2, 1);
         }
 
-        .main-grid.connectors-collapsed {
-            grid-template-columns: 310px 1fr 72px;
+        @keyframes pingRing {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(2.2); opacity: 0; }
         }
 
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 16px;
+        .state-disconnected { border-color: rgba(255,255,255,0.15); color: #64748b; }
+        .state-connected { border-color: var(--cyber-emerald); color: var(--cyber-emerald); box-shadow: var(--emerald-glow); }
+        .state-listening { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: var(--cyan-glow); }
+        .state-user_speaking { border-color: var(--plasma-violet); color: #D8B4FE; box-shadow: var(--plasma-glow); }
+        .state-thinking { border-color: var(--solar-amber); color: #FDE68A; box-shadow: var(--amber-glow); }
+        .state-speaking { border-color: var(--cyber-emerald); color: #A7F3D0; box-shadow: var(--emerald-glow); }
+        .state-error { border-color: var(--crimson-alert); color: #FECACA; box-shadow: var(--crimson-glow); }
+
+        /* Icon Action Buttons */
+        .btn-nav-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-fluid);
+        }
+
+        .btn-nav-icon:hover {
+            background: var(--cyan-dim);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            transform: scale(1.06);
+        }
+
+        /* 2. CENTER STAGE - HOLOGRAPHIC DIALOGUE & HUD OVERLAYS */
+        main.spatial-stage {
+            position: relative;
             display: flex;
             flex-direction: column;
-            position: relative;
-            overflow: hidden;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 24px;
+            pointer-events: none;
         }
 
-        .card-header {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 12px;
+        /* Live Holographic Dialogue Bubble (The Hero Speech Experience) */
+        .holo-dialogue-pod {
+            pointer-events: auto;
+            width: 100%;
+            max-width: 820px;
+            background: rgba(4, 9, 20, 0.75);
+            backdrop-filter: blur(32px);
+            -webkit-backdrop-filter: blur(32px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px 26px;
+            box-shadow: var(--glass-inner-bevel), 0 24px 60px rgba(0, 0, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.4s var(--ease-fluid);
+            animation: podFloat 6s ease-in-out infinite alternate;
+        }
+
+        @keyframes podFloat {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-6px); }
+        }
+
+        .dialogue-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .controls-row {
-            display: flex;
+        .speaker-badge {
+            display: inline-flex;
+            align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--neon-cyan);
         }
 
-        .btn {
-            padding: 9px 14px;
-            border-radius: 8px;
+        .speaker-badge svg {
+            color: var(--neon-cyan);
+        }
+
+        .audio-meter-strip {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 14px;
+        }
+
+        .audio-meter-bar {
+            width: 3px;
+            height: 4px;
+            background: var(--neon-cyan);
+            border-radius: 2px;
+            transition: height 0.08s ease;
+        }
+
+        .dialogue-text-stream {
+            font-family: var(--font-ui);
+            font-size: 18px;
+            line-height: 1.5;
+            color: var(--text-pure);
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            letter-spacing: -0.01em;
+            word-break: break-word;
+        }
+
+        .dialogue-text-stream.assistant-speaking {
+            color: #E2E8F0;
+            text-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+        }
+
+        .dialogue-text-stream.user-speaking {
+            color: #F3E8FF;
+            text-shadow: 0 0 16px rgba(168, 85, 247, 0.35);
+        }
+
+        /* Holographic Tool Action Trace Pod */
+        .holo-tool-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+            animation: toolPulse 1.5s infinite alternate ease-in-out;
+        }
+
+        @keyframes toolPulse {
+            0% { box-shadow: 0 0 12px rgba(0, 240, 255, 0.2); }
+            100% { box-shadow: 0 0 28px rgba(0, 240, 255, 0.5); }
+        }
+
+        /* 3. BOTTOM MASTER CONTROLLER DECK */
+        footer.cyber-deck {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .deck-console-bar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            max-width: 820px;
+            background: var(--glass-surface);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 10px 14px;
+            box-shadow: var(--glass-inner-bevel), 0 20px 48px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Massive Core Voice Activation Orb Button */
+        .btn-neural-core {
+            height: 48px;
+            padding: 0 24px;
+            border-radius: 12px;
+            font-family: var(--font-display);
             font-size: 13px;
-            font-weight: 600;
-            border: none;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
             cursor: pointer;
-            transition: all 0.2s ease;
+            border: 1px solid transparent;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 10px;
+            transition: all 0.3s var(--ease-fluid);
+            background: linear-gradient(135deg, #00F0FF 0%, #0077FF 100%);
+            color: var(--void-black);
+            box-shadow: 0 0 28px rgba(0, 240, 255, 0.5);
+            flex-shrink: 0;
         }
 
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-primary { background: #2563eb; color: #fff; }
-        .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
-        .btn-danger { background: #dc2626; color: #fff; }
-        .btn-danger:hover:not(:disabled) { background: #b91c1c; }
-        .btn-secondary { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); }
-        .btn-secondary:hover:not(:disabled) { background: #334155; }
-        .btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 6px; }
-        .btn-icon { padding: 5px; border-radius: 6px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
-        .btn-icon:hover { background: #1e293b; color: var(--text-main); }
-
-        canvas#visualizer {
-            width: 100%;
-            height: 65px;
-            background: #080c14;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            border: 1px solid var(--border-color);
+        .btn-neural-core:hover:not(:disabled) {
+            transform: scale(1.03);
+            box-shadow: 0 0 36px rgba(0, 240, 255, 0.8);
         }
 
-        .text-input-row {
-            display: flex;
-            gap: 6px;
+        .btn-neural-core:active:not(:disabled) {
+            transform: scale(0.97);
         }
 
-        .text-input-row input {
+        .btn-neural-core.active-session {
+            background: linear-gradient(135deg, #FF3366 0%, #B91C1C 100%);
+            color: #FFFFFF;
+            box-shadow: 0 0 28px rgba(255, 51, 102, 0.6);
+        }
+
+        .btn-neural-core:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            filter: grayscale(0.8);
+        }
+
+        /* Cyber Text Input */
+        .terminal-input-slot {
             flex: 1;
-            background: #080c14;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px 10px;
-            color: var(--text-main);
-            font-size: 12px;
-            outline: none;
+            position: relative;
+            display: flex;
+            align-items: center;
         }
 
-        .text-input-row input:focus { border-color: var(--accent-primary); }
+        .terminal-input-slot input {
+            width: 100%;
+            background: rgba(3, 7, 18, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px 14px 12px 38px;
+            color: var(--text-pure);
+            font-family: var(--font-body);
+            font-size: 13.5px;
+            outline: none;
+            transition: all 0.3s var(--ease-fluid);
+        }
 
-        /* Unified Stream Feed */
-        .stream-feed {
+        .terminal-input-slot input:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+            background: rgba(5, 12, 28, 0.9);
+        }
+
+        .terminal-input-slot input:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .terminal-input-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .btn-terminal-send {
+            height: 42px;
+            padding: 0 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-fluid);
+            flex-shrink: 0;
+        }
+
+        .btn-terminal-send:hover:not(:disabled) {
+            background: var(--cyan-dim);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .btn-terminal-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* 4. SLIDE-OUT SPATIAL DRAWERS (Connectors & Transcripts) */
+        .spatial-drawer {
+            position: fixed;
+            top: 20px;
+            bottom: 24px;
+            width: 380px;
+            background: var(--glass-surface);
+            backdrop-filter: blur(36px);
+            -webkit-backdrop-filter: blur(36px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-inner-bevel), 0 32px 80px rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 16px;
+            z-index: 10;
+            transition: transform 0.45s var(--ease-fluid), opacity 0.35s ease;
+        }
+
+        /* Left Drawer: Quantum Connectors Matrix */
+        #connectorsDrawer {
+            left: 28px;
+            transform: translateX(calc(-100% - 40px));
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #connectorsDrawer.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Right Drawer: Neural Transcript Stream */
+        #transcriptsDrawer {
+            right: 28px;
+            transform: translateX(calc(100% + 40px));
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #transcriptsDrawer.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .drawer-title {
+            font-family: var(--font-display);
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-pure);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .drawer-title svg {
+            color: var(--neon-cyan);
+        }
+
+        .drawer-content {
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 10px;
             padding-right: 4px;
-            max-height: calc(100vh - 160px);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 240, 255, 0.2) transparent;
         }
 
-        .bubble {
-            padding: 10px 14px;
-            border-radius: 10px;
+        .drawer-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .drawer-content::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.25);
+            border-radius: 4px;
+        }
+
+        /* Connectors Card Elements */
+        .connector-node-card {
+            background: rgba(4, 9, 20, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            transition: all 0.25s var(--ease-fluid);
+        }
+
+        .connector-node-card:hover {
+            border-color: var(--glass-border-bright);
+            background: rgba(8, 16, 36, 0.85);
+            transform: translateY(-2px);
+        }
+
+        .connector-node-card.connected {
+            border-left: 3px solid var(--cyber-emerald);
+        }
+
+        .node-info-block {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .node-icon-box {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .node-meta {
+            min-width: 0;
+        }
+
+        .node-name {
+            font-family: var(--font-ui);
             font-size: 13px;
-            line-height: 1.5;
-            max-width: 85%;
-            word-wrap: break-word;
+            font-weight: 700;
+            color: var(--text-pure);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .bubble-user {
-            background: #1e3a8a;
-            color: #dbeafe;
-            align-self: flex-end;
-            border-bottom-right-radius: 2px;
+        .node-status-text {
+            font-family: var(--font-mono);
+            font-size: 10.5px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .bubble-assistant {
-            background: #192233;
-            color: #f1f5f9;
-            align-self: flex-start;
-            border-bottom-left-radius: 2px;
-            border: 1px solid #222f47;
+        .node-status-text.online {
+            color: var(--cyber-emerald);
         }
 
-        /* Sleek Trace Badge */
-        .trace-card {
-            align-self: center;
-            width: 96%;
-            background: #0b111d;
-            border: 1px solid #1e3a8a55;
-            border-left: 3px solid #3b82f6;
-            border-radius: 6px;
-            padding: 7px 10px;
+        .btn-node-toggle {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
             font-size: 11px;
-            color: #93c5fd;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s var(--ease-fluid);
+            flex-shrink: 0;
+        }
+
+        .btn-node-connect {
+            background: rgba(0, 240, 255, 0.12);
+            color: var(--neon-cyan);
+            border-color: rgba(0, 240, 255, 0.35);
+        }
+
+        .btn-node-connect:hover {
+            background: var(--neon-cyan);
+            color: var(--void-black);
+            box-shadow: 0 0 16px var(--neon-cyan);
+        }
+
+        .btn-node-disconnect {
+            background: rgba(255, 51, 102, 0.12);
+            color: #FFA4B8;
+            border-color: rgba(255, 51, 102, 0.3);
+        }
+
+        .btn-node-disconnect:hover {
+            background: var(--crimson-alert);
+            color: #FFFFFF;
+            box-shadow: 0 0 16px var(--crimson-alert);
+        }
+
+        /* Transcript Feed Item */
+        .transcript-entry {
+            background: rgba(4, 9, 20, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 10px 12px;
             display: flex;
             flex-direction: column;
             gap: 4px;
-            transition: all 0.2s ease;
         }
 
-        .trace-header {
+        .transcript-meta {
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            font-weight: 600;
-        }
-
-        .trace-tag {
+            font-family: var(--font-mono);
             font-size: 10px;
-            background: #1e3a8a88;
-            color: #93c5fd;
-            padding: 1px 6px;
-            border-radius: 4px;
+            color: var(--text-tertiary);
         }
 
-        .trace-details {
-            font-family: monospace;
-            font-size: 10px;
-            color: #64748b;
-            white-space: pre-wrap;
-            word-break: break-all;
-            background: #060910;
-            padding: 4px 6px;
-            border-radius: 4px;
-            max-height: 80px;
-            overflow-y: auto;
+        .transcript-role-user { color: var(--plasma-violet); font-weight: 700; }
+        .transcript-role-agent { color: var(--neon-cyan); font-weight: 700; }
+
+        .transcript-body {
+            font-size: 12.5px;
+            line-height: 1.45;
+            color: var(--text-primary);
         }
 
-        /* Connectors Section */
-        .apps-feed {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            overflow-y: auto;
-            max-height: calc(100vh - 160px);
-        }
-
-        .app-item {
-            background: #0c121e;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 9px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            transition: border-color 0.2s ease;
-        }
-
-        .app-item.is-connected {
-            border-color: #065f46;
-            background: #08161e;
-        }
-
-        .app-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex: 1;
-            min-width: 0;
-        }
-
-        .app-icon {
-            width: 28px;
-            height: 28px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            background: #141c2c;
+        /* Voice Selector Pill in Deck */
+        .cyber-voice-select-box {
             position: relative;
+            display: flex;
+            align-items: center;
         }
 
-        .app-icon .online-dot {
-            position: absolute;
-            bottom: -2px;
-            right: -2px;
-            width: 8px;
-            height: 8px;
-            background: #10b981;
-            border: 2px solid #0f1523;
-            border-radius: 50%;
-        }
-
-        .app-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .app-info h4 {
+        .cyber-voice-select {
+            background: rgba(3, 7, 18, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px 30px 12px 12px;
+            color: var(--neon-cyan);
+            font-family: var(--font-mono);
             font-size: 12px;
             font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .app-info p {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 1px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Collapsed Connectors Mini Rail */
-        .connectors-mini-rail {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            padding-top: 6px;
-        }
-
-        .main-grid.connectors-collapsed .connectors-expanded-view {
-            display: none;
-        }
-
-        .main-grid.connectors-collapsed .connectors-mini-rail {
-            display: flex;
-        }
-
-        .mini-icon-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 8px;
-            background: #141c2c;
-            border: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
+            outline: none;
             cursor: pointer;
-            transition: all 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            transition: all 0.3s var(--ease-fluid);
         }
 
-        .mini-icon-btn:hover {
-            border-color: var(--accent-primary);
-            background: #1e293b;
+        .cyber-voice-select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.2);
         }
 
-        .mini-icon-btn.is-active {
-            border-color: #10b981;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
-        }
-
-        .mini-icon-btn .mini-dot {
+        .cyber-voice-arrow {
             position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 8px;
-            height: 8px;
-            background: #10b981;
-            border-radius: 50%;
-            border: 2px solid #0f1523;
+            right: 10px;
+            color: var(--neon-cyan);
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <header>
-        <div class="title-area">
-            <h1>Voice AI Agent Playground</h1>
-            <p>Full-Duplex Deepgram Voice Agent + Groq LPU + LangGraph Brain + Connectors</p>
-        </div>
-        <div id="statusBadge" class="status-badge">Disconnected</div>
-    </header>
 
-    <div id="mainGrid" class="main-grid">
-        <!-- 1. Voice Controls -->
-        <div class="card">
-            <div class="card-header">
-                <span>Voice Controls</span>
-                <span id="sessionInfo" style="font-size: 11px; color: var(--text-muted);">Session: inactive</span>
-            </div>
+    <!-- Three.js Spatial Hologram Canvas -->
+    <canvas id="viewport3d"></canvas>
 
-            <div class="controls-row">
-                <button id="startBtn" class="btn btn-primary" style="flex: 1;">Start Mic</button>
-                <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
-            </div>
+    <!-- Sci-Fi Vignette & Hex HUD Overlay -->
+    <div class="hud-vignette"></div>
 
-            <canvas id="visualizer"></canvas>
+    <!-- Master Spatial HUD Cockpit -->
+    <div class="spatial-hud">
 
-            <div class="card-header" style="margin-top: 10px;">
-                <span>Voice Model (Flux / Aura-2)</span>
-            </div>
-            <div style="margin-bottom: 8px;">
-                <label for="voiceSelect" style="display:none;">TTS Voice Model</label>
-                <select id="voiceSelect" style="width: 100%; padding: 8px 10px; background: #0c121e; color: #f1f5f9; border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; outline: none; cursor: pointer;">
-                    <option value="aura-2-thalia-en">Thalia (Aura-2 Female - Natural Companion)</option>
-                    <option value="aura-2-orion-en">Orion (Aura-2 Male - Professional Assistant)</option>
-                    <option value="aura-2-arcas-en">Arcas (Aura-2 Deep Male)</option>
-                    <option value="aura-2-perseus-en">Perseus (Aura-2 Energetic Male)</option>
-                    <option value="aura-2-angus-en">Angus (Aura-2 Irish Male)</option>
-                    <option value="aura-2-helios-en">Helios (Aura-2 British Male)</option>
-                    <option value="aura-2-zeus-en">Zeus (Aura-2 Resonant Male)</option>
-                    <option value="aura-asteria-en">Asteria (Aura-1 Classic)</option>
-                    <option value="aura-luna-en">Luna (Aura-1 Gentle)</option>
-                    <option value="aura-stella-en">Stella (Aura-1 Executive)</option>
-                </select>
-            </div>
-
-            <div class="card-header" style="margin-top: 6px;">
-                <span>Type Text Query</span>
-            </div>
-            <div class="text-input-row">
-                <label for="textInput" style="display:none;">Message input</label>
-                <input type="text" id="textInput" placeholder="Type query or speak into mic..." disabled>
-                <button id="sendBtn" class="btn btn-secondary" disabled>Send</button>
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.4;">
-                Send injects text directly into the agent session while synthesizing spoken audio responses.
-            </div>
-        </div>
-
-        <!-- 2. Live Conversation Stream & Real-time Traces -->
-        <div class="card">
-            <div class="card-header">
-                <span>Conversation Stream</span>
-                <button id="clearBtn" class="btn btn-secondary btn-sm">Clear</button>
-            </div>
-
-            <div id="streamFeed" class="stream-feed">
-                <div class="bubble bubble-assistant">
-                    Click <strong>Start Mic</strong> to begin speaking with your assistant. Real-time actions and tools will trace seamlessly in this feed.
+        <!-- 1. Top Cyber Nav Capsule -->
+        <header class="cyber-nav">
+            <div class="nav-brand">
+                <div class="brand-core-glyph">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
                 </div>
-            </div>
-        </div>
-
-        <!-- 3. Connectors Column -->
-        <div id="connectorsCard" class="card">
-            <!-- Expanded View Header -->
-            <div class="connectors-expanded-view card-header">
-                <span>Connectors</span>
-                <div style="display: flex; gap: 4px;">
-                    <button id="refreshAppsBtn" class="btn btn-secondary btn-sm">Refresh</button>
-                    <button id="toggleCollapseBtn" class="btn btn-icon btn-sm" title="Collapse panel">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-                    </button>
+                <div class="brand-text-block">
+                    <span class="brand-title">AETHERIS · AI</span>
+                    <span class="brand-subtitle">Quantum Neural Voice Matrix</span>
                 </div>
             </div>
 
-            <!-- Expanded App List -->
-            <div id="appsList" class="connectors-expanded-view apps-feed">
-                <!-- Dynamically populated and sorted by connection status -->
+            <div class="nav-center-telemetry">
+                <div class="telemetry-chip">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span>LATENCY:</span>
+                    <span id="latencyDisplay" class="val">-- ms</span>
+                </div>
+                <div class="telemetry-chip">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                    <span>SAMPLE:</span>
+                    <span class="val">16kHz PCM</span>
+                </div>
+                <div class="telemetry-chip">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span>TURNS:</span>
+                    <span id="turnsDisplay" class="val">0</span>
+                </div>
             </div>
 
-            <!-- Collapsed Mini Rail -->
-            <div class="connectors-mini-rail">
-                <button id="expandConnectorsBtn" class="btn btn-icon btn-sm" title="Expand Connectors" style="margin-bottom: 6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            <div class="nav-right-actions">
+                <div id="stateBadge" class="state-indicator-badge state-disconnected">
+                    <span class="state-dot"></span>
+                    <span id="stateLabel">DISCONNECTED</span>
+                </div>
+
+                <button id="toggleConnectorsBtn" class="btn-nav-icon" title="Toggle Connectors Matrix">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="18" cy="18" r="3"></circle>
+                        <circle cx="6" cy="6" r="3"></circle>
+                        <path d="M13 6h3a2 2 0 0 1 2 2v7"></path>
+                        <line x1="6" y1="9" x2="6" y2="21"></line>
+                    </svg>
                 </button>
-                <div id="miniAppsList" style="display: flex; flex-direction: column; gap: 8px;">
-                    <!-- Mini icons with active dots -->
+
+                <button id="toggleTranscriptsBtn" class="btn-nav-icon" title="Toggle Neural Transcripts">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 2. Center Stage - Holographic Live Dialogue Pod -->
+        <main class="spatial-stage">
+            <div class="holo-dialogue-pod">
+                <div class="dialogue-header">
+                    <div class="speaker-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                        <span id="currentSpeakerLabel">AETHERIS NEURAL VOICE</span>
+                    </div>
+
+                    <div class="audio-meter-strip" id="audioMeterStrip">
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                        <div class="audio-meter-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Ephemeral Realtime Tool Execution Hologram -->
+                <div id="toolExecutionBanner" class="holo-tool-banner">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span id="toolExecutionText">EXECUTING COMPOSIO WORKSPACE ACTION...</span>
+                    </div>
+                    <span style="font-size:10px; opacity:0.8;">ZERO-LATENCY DISPATCH</span>
+                </div>
+
+                <!-- Live Spoken Subtitle Stream -->
+                <div id="dialogueTextStream" class="dialogue-text-stream">
+                    Ready to initialize. Press Activate Voice Matrix to begin spoken dialogue.
                 </div>
             </div>
-        </div>
+        </main>
+
+        <!-- 3. Bottom Master Controller Deck -->
+        <footer class="cyber-deck">
+            <div class="deck-console-bar">
+                <button id="mainVoiceOrbBtn" class="btn-neural-core">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="22"></line>
+                    </svg>
+                    <span id="voiceOrbBtnText">Activate Voice Matrix</span>
+                </button>
+
+                <div class="cyber-voice-select-box">
+                    <select id="voiceModelSelect" class="cyber-voice-select">
+                        <option value="aura-2-thalia-en">Thalia (Aura-2 Companion)</option>
+                        <option value="aura-2-orion-en">Orion (Aura-2 Executive)</option>
+                        <option value="aura-2-arcas-en">Arcas (Aura-2 Deep Male)</option>
+                        <option value="aura-2-perseus-en">Perseus (Aura-2 Energetic)</option>
+                        <option value="aura-2-zeus-en">Zeus (Aura-2 Resonant)</option>
+                        <option value="aura-asteria-en">Asteria (Aura-1 Classic)</option>
+                    </select>
+                    <svg class="cyber-voice-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"></path>
+                    </svg>
+                </div>
+
+                <div class="terminal-input-slot">
+                    <svg class="terminal-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="4 17 10 11 4 5"></polyline>
+                        <line x1="12" y1="19" x2="20" y2="19"></line>
+                    </svg>
+                    <input type="text" id="terminalInput" placeholder="Type direct instruction or question to inject..." disabled>
+                </div>
+
+                <button id="terminalSendBtn" class="btn-terminal-send" disabled>
+                    <span>INJECT</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+
     </div>
 
-    <script>
-        let ws = null;
-        let audioContext = null;
-        let micStream = null;
-        let processor = null;
-        let isConnected = false;
-        let isCollapsed = false;
+    <!-- 4. Left Slide-out: Quantum Connector Matrix Drawer -->
+    <aside id="connectorsDrawer" class="spatial-drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="18" r="3"></circle>
+                    <circle cx="6" cy="6" r="3"></circle>
+                    <path d="M13 6h3a2 2 0 0 1 2 2v7"></path>
+                    <line x1="6" y1="9" x2="6" y2="21"></line>
+                </svg>
+                Connector Nodes
+            </div>
+            <button id="closeConnectorsBtn" class="btn-nav-icon" style="width:28px; height:28px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
 
-        const mainGrid = document.getElementById('mainGrid');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const sendBtn = document.getElementById('sendBtn');
-        const textInput = document.getElementById('textInput');
-        const voiceSelect = document.getElementById('voiceSelect');
-        const statusBadge = document.getElementById('statusBadge');
-        const sessionInfo = document.getElementById('sessionInfo');
-        const streamFeed = document.getElementById('streamFeed');
-        const appsList = document.getElementById('appsList');
-        const miniAppsList = document.getElementById('miniAppsList');
-        const clearBtn = document.getElementById('clearBtn');
-        const refreshAppsBtn = document.getElementById('refreshAppsBtn');
-        const toggleCollapseBtn = document.getElementById('toggleCollapseBtn');
-        const expandConnectorsBtn = document.getElementById('expandConnectorsBtn');
-        const canvas = document.getElementById('visualizer');
-        const canvasCtx = canvas.getContext('2d');
+        <div id="connectorsList" class="drawer-content">
+            <!-- Dynamically injected from /api/integrations/apps and /api/integrations/status -->
+        </div>
+    </aside>
 
-        // Brand SVG Logos
-        const APP_ICONS = {
-            GMAIL: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`,
-            OUTLOOK: `<svg width="20" height="20" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0078D4"/><path fill="#FFF" d="M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm7-4.5V17a2 2 0 0 1-2 2H7l-4-3V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2.5z"/></svg>`,
-            GOOGLECALENDAR: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/><path fill="#34A853" d="M12 11h5v5h-5z"/></svg>`,
-            GOOGLESHEETS: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#0F9D58" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path fill="#0F9D58" d="M7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>`,
-            GOOGLEDOCS: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
-            GOOGLEDRIVE: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#FFC107" d="M8.5 3l4.5 7.8H4L1.7 6.4 8.5 3z"/><path fill="#2196F3" d="M22.3 15.6l-2.3 4H7l4.5-7.8h10.8z"/><path fill="#4CAF50" d="M13 10.8L8.5 3 4 10.8l4.5 7.8 4.5-7.8z"/></svg>`,
-            SERPAPI: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h5.9c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7c2.2-2 3.2-5 3.2-8.4z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3.3 0-6.1-2.2-7.1-5.3H1.1v2.9C3.1 20 7.2 23 12 23z"/><path fill="#FBBC05" d="M4.9 13.1c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3V5.6H1.1C.4 7 0 8.6 0 10.8s.4 3.8 1.1 5.2l3.8-2.9z"/><path fill="#EA4335" d="M12 4.4c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1 15.2 0 12 0 7.2 0 3.1 3 1.1 7l3.8 2.9c1-3.1 3.8-5.5 7.1-5.5z"/></svg>`,
-            PERPLEXITYAI: `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#22D3EE" d="M12 2L9 7h6l-3-5zm0 20l3-5H9l3 5zm8-10l-5-3v6l5-3zM4 12l5 3V9L4 12z"/><circle cx="12" cy="12" r="3" fill="#06B6D4"/></svg>`,
-        };
+    <!-- 5. Right Slide-out: Neural Transcripts Drawer -->
+    <aside id="transcriptsDrawer" class="spatial-drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Session Log
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button id="clearTranscriptsBtn" class="btn-nav-icon" style="width:28px; height:28px;" title="Clear log">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+                <button id="closeTranscriptsBtn" class="btn-nav-icon" style="width:28px; height:28px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
 
-        function setCollapsed(collapsed) {
-            isCollapsed = collapsed;
-            if (collapsed) mainGrid.classList.add('connectors-collapsed');
-            else mainGrid.classList.remove('connectors-collapsed');
-        }
-
-        toggleCollapseBtn.onclick = () => setCollapsed(true);
-        expandConnectorsBtn.onclick = () => setCollapsed(false);
-
-        function updateStatus(state) {
-            statusBadge.className = 'status-badge status-' + state.toLowerCase();
-            statusBadge.textContent = state.replace('_', ' ');
-        }
-
-        function appendMessage(role, text) {
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble bubble-' + (role === 'user' ? 'user' : 'assistant');
-            bubble.textContent = text;
-            streamFeed.appendChild(bubble);
-            streamFeed.scrollTop = streamFeed.scrollHeight;
-        }
-
-        function formatNaturalToolBrief(name, params) {
-            if (name === 'search_emails') {
-                const q = params.query ? ` for "${params.query}"` : '';
-                return `Searching emails${q}`;
-            } else if (name === 'send_email') {
-                return `Sending email to ${params.recipient || 'recipient'}`;
-            } else if (name === 'list_calendar_events') {
-                return 'Checking upcoming calendar events';
-            } else if (name === 'create_calendar_event') {
-                return `Scheduling "${params.title || 'Meeting'}"`;
-            } else if (name === 'get_current_time') {
-                return 'Checking current time';
-            } else if (name === 'end_voice_session') {
-                return 'Ending voice session';
-            } else if (name === 'web_search_serpapi' || name === 'SERPAPI_SEARCH') {
-                return `Searching the web for "${params.query || ''}"`;
-            } else if (name === 'execute_app_action') {
-                return `Executing ${params.intent || 'action'} on ${params.app_name || 'workspace'}`;
-            }
-            return `Executing ${name.replaceAll('_', ' ')}`;
-        }
-
-        let activeActivityCard = null;
-
-        function showEphemeralActivity(name, params) {
-            removeEphemeralActivity();
-            const brief = formatNaturalToolBrief(name, params);
-            const card = document.createElement('div');
-            card.className = 'trace-card';
-            card.id = 'ephemeralActivityIndicator';
-            card.innerHTML = `
-                <div class="trace-header">
-                    <span style="display:flex;align-items:center;gap:6px;">
-                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;animation:pulse 1s infinite;"></span>
-                        ${brief}...
-                    </span>
+        <div id="transcriptEntries" class="drawer-content">
+            <div class="transcript-entry">
+                <div class="transcript-meta">
+                    <span class="transcript-role-agent">SYSTEM</span>
+                    <span>SESSION INIT</span>
                 </div>
-            `;
-            streamFeed.appendChild(card);
-            streamFeed.scrollTop = streamFeed.scrollHeight;
-            activeActivityCard = card;
-        }
+                <div class="transcript-body">AETHERIS Quantum Voice Node online and standby.</div>
+            </div>
+        </div>
+    </aside>
 
-        function removeEphemeralActivity() {
-            if (activeActivityCard) {
-                activeActivityCard.remove();
-            }
-            activeActivityCard = null;
-        }
+    <!-- Master Application Code -->
+    <script>
+        // ==============================================================
+        // 1. THREE.JS 3D NEURAL CORE & PROCEDURAL ENERGY PARTICLES
+        // ==============================================================
+        let scene, camera, renderer;
+        let coreSphere, outerWireframe, orbitalGimbalRings = [], particleSwarm;
+        let clock = new THREE.Clock();
+        let targetColor = new THREE.Color(0x00F0FF);
+        let currentColor = new THREE.Color(0x00F0FF);
+        let audioRMS = 0.0;
+        let coreSpeed = 1.0;
+        let isPointerDown = false, prevMouseX = 0, prevMouseY = 0;
 
-        clearBtn.onclick = () => {
-            removeEphemeralActivity();
-            streamFeed.innerHTML = '';
+        const STATE_THEMES = {
+            DISCONNECTED: { color: 0x334155, speed: 0.3, emissive: 0x0f172a },
+            CONNECTED: { color: 0x00FF9D, speed: 0.8, emissive: 0x064e3b },
+            LISTENING: { color: 0x00F0FF, speed: 1.2, emissive: 0x0e7490 },
+            USER_SPEAKING: { color: 0xA855F7, speed: 2.5, emissive: 0x581c87 },
+            THINKING: { color: 0xF59E0B, speed: 3.8, emissive: 0x78350f },
+            SPEAKING: { color: 0x00FF9D, speed: 2.2, emissive: 0x064e3b },
+            ERROR: { color: 0xFF3366, speed: 1.8, emissive: 0x7f1d1d }
         };
 
-        // Load Apps and Sort by Active Connections
-        async function loadApps() {
+        function init3D() {
+            const canvas = document.getElementById('viewport3d');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x020408, 0.02);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 24);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Cyber Lighting
+            const ambientLight = new THREE.AmbientLight(0x0a1128, 2.0);
+            scene.add(ambientLight);
+
+            const cyanLight = new THREE.PointLight(0x00F0FF, 3.5, 60);
+            cyanLight.position.set(12, 12, 12);
+            scene.add(cyanLight);
+
+            const purpleLight = new THREE.PointLight(0xA855F7, 3.0, 60);
+            purpleLight.position.set(-12, -12, 12);
+            scene.add(purpleLight);
+
+            // 1. Procedural Neural Core Icosahedron
+            const coreGeo = new THREE.IcosahedronGeometry(4.2, 4);
+            const coreMat = new THREE.MeshStandardMaterial({
+                color: 0x00F0FF,
+                emissive: 0x002b4d,
+                roughness: 0.1,
+                metalness: 0.9,
+                wireframe: false,
+                transparent: true,
+                opacity: 0.88,
+            });
+            coreSphere = new THREE.Mesh(coreGeo, coreMat);
+            scene.add(coreSphere);
+
+            // 2. Outer Wireframe Hologram
+            const wireGeo = new THREE.IcosahedronGeometry(4.9, 2);
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: 0x00F0FF,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.3,
+            });
+            outerWireframe = new THREE.Mesh(wireGeo, wireMat);
+            scene.add(outerWireframe);
+
+            // 3. Concentric Gyroscopic Quantum Rings
+            const ringRadii = [6.2, 7.6, 9.0];
+            ringRadii.forEach((radius, i) => {
+                const ringGeo = new THREE.TorusGeometry(radius, 0.035, 16, 120);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: i === 0 ? 0x00F0FF : i === 1 ? 0xA855F7 : 0x00FF9D,
+                    transparent: true,
+                    opacity: 0.45,
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / (i + 1.6);
+                ring.rotation.y = Math.PI / (i + 2.2);
+                scene.add(ring);
+                orbitalGimbalRings.push({ mesh: ring, speedX: (i + 1) * 0.16, speedY: (3 - i) * 0.22 });
+            });
+
+            // 4. Stardust Quantum Particle Cloud (2,000 Points)
+            const particleCount = 2000;
+            const particleGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                const r = 7 + Math.random() * 22;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+
+                positions[i] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+                positions[i + 2] = r * Math.cos(phi);
+
+                colors[i] = 0.0;
+                colors[i + 1] = 0.94;
+                colors[i + 2] = 1.0;
+            }
+
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.12,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.55,
+                blending: THREE.AdditiveBlending,
+            });
+            particleSwarm = new THREE.Points(particleGeo, particleMat);
+            scene.add(particleSwarm);
+
+            // Drag Orbit & Parallax
+            canvas.addEventListener('mousedown', (e) => {
+                isPointerDown = true;
+                prevMouseX = e.clientX;
+                prevMouseY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => { isPointerDown = false; });
+
+            window.addEventListener('mousemove', (e) => {
+                if (isPointerDown) {
+                    const deltaX = e.clientX - prevMouseX;
+                    const deltaY = e.clientY - prevMouseY;
+                    coreSphere.rotation.y += deltaX * 0.005;
+                    coreSphere.rotation.x += deltaY * 0.005;
+                    prevMouseX = e.clientX;
+                    prevMouseY = e.clientY;
+                } else {
+                    const xNorm = (e.clientX / window.innerWidth - 0.5) * 2;
+                    const yNorm = (e.clientY / window.innerHeight - 0.5) * 2;
+                    gsap.to(camera.position, {
+                        x: xNorm * 3.0,
+                        y: -yNorm * 2.2,
+                        duration: 1.2,
+                        ease: "power2.out"
+                    });
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate3D();
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            const time = clock.getElapsedTime();
+
+            currentColor.lerp(targetColor, 0.06);
+
+            if (coreSphere) {
+                coreSphere.material.color.copy(currentColor);
+                outerWireframe.material.color.copy(currentColor);
+
+                // Audio reactive harmonic pulsation
+                const scale = 1.0 + Math.sin(time * 2.2) * 0.03 + (audioRMS * 0.4);
+                coreSphere.scale.set(scale, scale, scale);
+                outerWireframe.scale.set(scale * 1.08, scale * 1.08, scale * 1.08);
+
+                coreSphere.rotation.y += 0.006 * coreSpeed;
+                coreSphere.rotation.x += 0.003 * coreSpeed;
+                outerWireframe.rotation.y -= 0.005 * coreSpeed;
+            }
+
+            orbitalGimbalRings.forEach(item => {
+                item.mesh.rotation.x += 0.004 * item.speedX * coreSpeed;
+                item.mesh.rotation.y += 0.005 * item.speedY * coreSpeed;
+            });
+
+            if (particleSwarm) {
+                particleSwarm.rotation.y += 0.0006 * coreSpeed;
+                particleSwarm.rotation.z += 0.0003;
+            }
+
+            // Animate dialogue audio meter bars
+            const bars = document.querySelectorAll('.audio-meter-bar');
+            bars.forEach((bar, idx) => {
+                const height = 4 + Math.sin(time * 10 + idx) * 8 * (audioRMS > 0.05 ? audioRMS * 2.5 : 0.2);
+                bar.style.height = `${Math.max(4, Math.min(16, height))}px`;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function setCoreStateTheme(state) {
+            const theme = STATE_THEMES[state] || STATE_THEMES.DISCONNECTED;
+            targetColor = new THREE.Color(theme.color);
+            coreSpeed = theme.speed;
+        }
+
+        // ==============================================================
+        // 2. QUANTUM CONNECTORS MATRIX (REAL COMPOSIO REST API)
+        // ==============================================================
+        const APP_VECTORS = {
+            GMAIL: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`,
+            OUTLOOK: `<svg width="18" height="18" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0078D4"/><path fill="#FFF" d="M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm7-4.5V17a2 2 0 0 1-2 2H7l-4-3V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2.5z"/></svg>`,
+            GOOGLECALENDAR: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/><path fill="#34A853" d="M12 11h5v5h-5z"/></svg>`,
+            GOOGLESHEETS: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#0F9D58" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path fill="#0F9D58" d="M7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>`,
+            GOOGLEDOCS: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
+            GOOGLEDRIVE: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFC107" d="M8.5 3l4.5 7.8H4L1.7 6.4 8.5 3z"/><path fill="#2196F3" d="M22.3 15.6l-2.3 4H7l4.5-7.8h10.8z"/><path fill="#4CAF50" d="M13 10.8L8.5 3 4 10.8l4.5 7.8 4.5-7.8z"/></svg>`,
+            SERPAPI: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h5.9c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7c2.2-2 3.2-5 3.2-8.4z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3.3 0-6.1-2.2-7.1-5.3H1.1v2.9C3.1 20 7.2 23 12 23z"/><path fill="#FBBC05" d="M4.9 13.1c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3V5.6H1.1C.4 7 0 8.6 0 10.8s.4 3.8 1.1 5.2l3.8-2.9z"/><path fill="#EA4335" d="M12 4.4c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1 15.2 0 12 0 7.2 0 3.1 3 1.1 7l3.8 2.9c1-3.1 3.8-5.5 7.1-5.5z"/></svg>`,
+            PERPLEXITYAI: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#22D3EE" d="M12 2L9 7h6l-3-5zm0 20l3-5H9l3 5zm8-10l-5-3v6l5-3zM4 12l5 3V9L4 12z"/><circle cx="12" cy="12" r="3" fill="#06B6D4"/></svg>`,
+        };
+
+        const connectorsDrawer = document.getElementById('connectorsDrawer');
+        const transcriptsDrawer = document.getElementById('transcriptsDrawer');
+        const connectorsList = document.getElementById('connectorsList');
+
+        document.getElementById('toggleConnectorsBtn').onclick = () => connectorsDrawer.classList.toggle('open');
+        document.getElementById('closeConnectorsBtn').onclick = () => connectorsDrawer.classList.remove('open');
+
+        document.getElementById('toggleTranscriptsBtn').onclick = () => transcriptsDrawer.classList.toggle('open');
+        document.getElementById('closeTranscriptsBtn').onclick = () => transcriptsDrawer.classList.remove('open');
+
+        async function fetchAndRenderConnectors() {
             try {
+                // 1. Fetch supported apps and active connection status concurrently
                 const [appsRes, statusRes] = await Promise.all([
                     fetch('/api/integrations/apps'),
-                    fetch('/api/integrations/status?user_id=web_user'),
+                    fetch('/api/integrations/status?user_id=web_user')
                 ]);
+
                 const appsData = await appsRes.json();
                 const statusData = await statusRes.json();
 
-                const connectedMap = {};
-                (statusData.connected_accounts || []).forEach(acc => {
-                    if (acc.status === 'ACTIVE') {
-                        connectedMap[acc.app] = acc;
-                    }
-                });
+                const supported = appsData.apps || [];
+                const connectedList = statusData.connected_accounts || [];
 
-                // Order by active connections first
-                const sortedApps = [...appsData.apps].sort((a, b) => {
-                    const aConn = connectedMap[a.name] ? 1 : 0;
-                    const bConn = connectedMap[b.name] ? 1 : 0;
-                    return bConn - aConn;
-                });
+                connectorsList.innerHTML = '';
 
-                appsList.innerHTML = '';
-                miniAppsList.innerHTML = '';
+                supported.forEach(app => {
+                    const appKey = (app.name || '').toUpperCase();
+                    const isConnected = connectedList.some(c => (c.app || '').toUpperCase() === appKey || (c.app_key || '').toUpperCase() === appKey);
+                    const connectedObj = connectedList.find(c => (c.app || '').toUpperCase() === appKey || (c.app_key || '').toUpperCase() === appKey);
+                    const connectionId = connectedObj ? (connectedObj.id || connectedObj.connection_id || appKey) : appKey;
 
-                sortedApps.forEach(app => {
-                    const connected = connectedMap[app.name];
-                    const iconSvg = APP_ICONS[app.name] || `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#60a5fa"/></svg>`;
-                    
-                    // 1. Expanded App Card
-                    const item = document.createElement('div');
-                    item.className = `app-item ${connected ? 'is-connected' : ''}`;
-                    item.innerHTML = `
-                        <div class="app-left">
-                            <div class="app-icon">
-                                ${iconSvg}
-                                ${connected ? '<div class="online-dot"></div>' : ''}
-                            </div>
-                            <div class="app-info">
-                                <div style="display:flex;align-items:center;gap:6px;">
-                                    <h4>${app.display_name}</h4>
-                                    ${connected ? '<span style="background:#064e3b;color:#6ee7b7;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;border:1px solid #10b981;">CONNECTED</span>' : ''}
+                    const icon = APP_VECTORS[appKey] || `
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        </svg>
+                    `;
+
+                    const card = document.createElement('div');
+                    card.className = `connector-node-card ${isConnected ? 'connected' : ''}`;
+                    card.innerHTML = `
+                        <div class="node-info-block">
+                            <div class="node-icon-box">${icon}</div>
+                            <div class="node-meta">
+                                <div class="node-name">${app.display_name || app.name}</div>
+                                <div class="node-status-text ${isConnected ? 'online' : ''}">
+                                    <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;"></span>
+                                    ${isConnected ? 'ONLINE / CONNECTED' : 'STANDBY'}
                                 </div>
-                                <p>${app.description}</p>
                             </div>
                         </div>
-                        ${connected
-                            ? `<button class="btn btn-danger btn-sm" onclick="disconnectApp('${connected.id}')">Disconnect</button>`
-                            : `<button class="btn btn-secondary btn-sm" onclick="connectApp('${app.name}')">Connect</button>`
-                        }
+                        <div>
+                            ${isConnected
+                                ? `<button class="btn-node-toggle btn-node-disconnect" onclick="disconnectNode('${connectionId}')">DISCONNECT</button>`
+                                : `<button class="btn-node-toggle btn-node-connect" onclick="connectNode('${app.name}')">CONNECT</button>`
+                            }
+                        </div>
                     `;
-                    appsList.appendChild(item);
-
-                    // 2. Mini Rail Icon
-                    const miniBtn = document.createElement('div');
-                    miniBtn.className = `mini-icon-btn ${connected ? 'is-active' : ''}`;
-                    miniBtn.title = `${app.display_name} ${connected ? '(Connected)' : '(Click to connect)'}`;
-                    miniBtn.innerHTML = `
-                        ${iconSvg}
-                        ${connected ? '<div class="mini-dot"></div>' : ''}
-                    `;
-                    miniBtn.onclick = () => {
-                        if (connected) disconnectApp(connected.id);
-                        else connectApp(app.name);
-                    };
-                    miniAppsList.appendChild(miniBtn);
+                    connectorsList.appendChild(card);
                 });
+
             } catch (err) {
-                console.error('Failed to load apps:', err);
-                appsList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Failed to load connectors.</div>';
+                console.error('Failed to load connectors:', err);
+                connectorsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-tertiary); font-family:var(--font-mono); font-size:11px;">ERROR LOADING CONNECTORS</div>`;
             }
         }
 
-        window.connectApp = async (appName) => {
+        window.connectNode = async (appName) => {
             try {
                 const res = await fetch(`/api/integrations/connect/${appName}?user_id=web_user`);
                 const data = await res.json();
-                if (data.redirect_url) {
-                    const popup = window.open(data.redirect_url, '_blank', 'width=600,height=700');
-                    const timer = setInterval(() => {
-                        if (!popup || popup.closed) {
-                            clearInterval(timer);
-                            void loadApps();
+                if (data.auth_url) {
+                    window.open(data.auth_url, '_blank');
+                    const interval = setInterval(async () => {
+                        const check = await fetch('/api/integrations/status?user_id=web_user');
+                        const cData = await check.json();
+                        const target = (cData.connected_accounts || []).find(a => (a.app || a.app_key || '').toUpperCase() === appName.toUpperCase());
+                        if (target) {
+                            clearInterval(interval);
+                            void fetchAndRenderConnectors();
                         }
-                    }, 1000);
+                    }, 2500);
                 } else {
-                    alert('Connection initiated: ' + (data.message || JSON.stringify(data)));
+                    void fetchAndRenderConnectors();
                 }
-            } catch (err) {
-                alert('OAuth initiation failed: ' + err);
+            } catch (e) {
+                alert('OAuth initiation failed: ' + e);
             }
         };
 
-        window.disconnectApp = async (connectionId) => {
-            if (!confirm('Disconnect this connector?')) return;
+        window.disconnectNode = async (connectionId) => {
+            if (!confirm('Disconnect this workspace integration node?')) return;
             try {
                 const res = await fetch(`/api/integrations/${connectionId}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (data.success) {
-                    void loadApps();
+                    void fetchAndRenderConnectors();
                 } else {
                     alert('Disconnect failed: ' + (data.detail || data.error));
                 }
-            } catch (err) {
-                alert('Failed to disconnect: ' + err);
+            } catch (e) {
+                alert('Failed to disconnect: ' + e);
             }
         };
 
-        async function loadVoiceCatalog() {
-            try {
-                const res = await fetch('/api/voice/catalog');
-                const data = await res.json();
-                if (data.voices && data.voices.length > 0 && voiceSelect) {
-                    voiceSelect.innerHTML = '';
-                    data.voices.forEach(v => {
-                        const opt = document.createElement('option');
-                        opt.value = v.id;
-                        opt.textContent = `${v.name} (${v.accent} ${v.gender})`;
-                        if (v.id === 'aura-2-thalia-en') opt.selected = true;
-                        voiceSelect.appendChild(opt);
-                    });
-                }
-            } catch (e) {
-                console.warn('Voice catalog fetch fallback:', e);
+        // ==============================================================
+        // 3. WEBSOCKET & DUPLEX AUDIO PIPELINE
+        // ==============================================================
+        let ws = null;
+        let audioContext = null;
+        let micStream = null;
+        let processor = null;
+        let isSessionActive = false;
+        let playbackContext = null;
+        let nextPlayTime = 0;
+        let activeSources = [];
+        let playbackSuppressed = false;
+        let turnCounter = 0;
+
+        const mainVoiceOrbBtn = document.getElementById('mainVoiceOrbBtn');
+        const voiceOrbBtnText = document.getElementById('voiceOrbBtnText');
+        const voiceModelSelect = document.getElementById('voiceModelSelect');
+        const terminalInput = document.getElementById('terminalInput');
+        const terminalSendBtn = document.getElementById('terminalSendBtn');
+        const stateBadge = document.getElementById('stateBadge');
+        const stateLabel = document.getElementById('stateLabel');
+        const currentSpeakerLabel = document.getElementById('currentSpeakerLabel');
+        const dialogueTextStream = document.getElementById('dialogueTextStream');
+        const toolExecutionBanner = document.getElementById('toolExecutionBanner');
+        const toolExecutionText = document.getElementById('toolExecutionText');
+        const transcriptEntries = document.getElementById('transcriptEntries');
+        const turnsDisplay = document.getElementById('turnsDisplay');
+        const latencyDisplay = document.getElementById('latencyDisplay');
+
+        function setHUDState(state) {
+            const formatted = state.toUpperCase();
+            stateBadge.className = 'state-indicator-badge state-' + state.toLowerCase();
+            stateLabel.textContent = formatted.replace('_', ' ');
+            setCoreStateTheme(formatted);
+
+            if (formatted === 'USER_SPEAKING') {
+                currentSpeakerLabel.textContent = 'OPERATOR (USER)';
+                dialogueTextStream.className = 'dialogue-text-stream user-speaking';
+            } else if (formatted === 'SPEAKING') {
+                currentSpeakerLabel.textContent = 'AETHERIS (AGENT)';
+                dialogueTextStream.className = 'dialogue-text-stream assistant-speaking';
+            } else if (formatted === 'THINKING') {
+                currentSpeakerLabel.textContent = 'NEURAL PROCESSING...';
+            } else {
+                currentSpeakerLabel.textContent = 'AETHERIS NEURAL VOICE';
+                dialogueTextStream.className = 'dialogue-text-stream';
             }
         }
 
-        if (voiceSelect) {
-            voiceSelect.onchange = () => {
-                const newVoice = voiceSelect.value;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'UpdateSpeak',
-                        voice: newVoice,
-                    }));
-                }
-            };
+        function appendTranscriptLog(role, text) {
+            const entry = document.createElement('div');
+            entry.className = 'transcript-entry';
+            const timeStr = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <div class="transcript-meta">
+                    <span class="${role === 'user' ? 'transcript-role-user' : 'transcript-role-agent'}">${role === 'user' ? 'OPERATOR' : 'AETHERIS'}</span>
+                    <span>${timeStr}</span>
+                </div>
+                <div class="transcript-body">${text}</div>
+            `;
+            transcriptEntries.appendChild(entry);
+            transcriptEntries.scrollTop = transcriptEntries.scrollHeight;
         }
 
-        refreshAppsBtn.onclick = () => { void loadApps(); };
-        window.addEventListener('DOMContentLoaded', () => {
-            void loadApps();
-            void loadVoiceCatalog();
-        });
+        document.getElementById('clearTranscriptsBtn').onclick = () => {
+            transcriptEntries.innerHTML = '';
+            turnCounter = 0;
+            turnsDisplay.textContent = '0';
+        };
 
-        startBtn.onclick = async () => {
+        function showToolHolo(name, params) {
+            toolExecutionBanner.style.display = 'flex';
+            let brief = `EXECUTING ${name.toUpperCase().replaceAll('_', ' ')}`;
+            if (name === 'search_emails') brief = `SEARCHING GMAIL FOR "${params.query || ''}"`;
+            else if (name === 'send_email') brief = `SENDING EMAIL TO ${params.recipient || 'recipient'}`;
+            else if (name === 'list_calendar_events') brief = 'FETCHING CALENDAR MEETINGS';
+            else if (name === 'create_calendar_event') brief = `SCHEDULING "${params.title || 'Meeting'}"`;
+            else if (name === 'web_search_serpapi') brief = `RUNNING GOOGLE SEARCH: "${params.query || ''}"`;
+
+            toolExecutionText.textContent = brief;
+        }
+
+        function hideToolHolo() {
+            toolExecutionBanner.style.display = 'none';
+        }
+
+        mainVoiceOrbBtn.onclick = async () => {
+            if (isSessionActive) {
+                stopSession();
+                return;
+            }
+
             try {
-                const selectedVoice = voiceSelect ? voiceSelect.value : 'aura-2-thalia-en';
+                const selectedVoice = voiceModelSelect ? voiceModelSelect.value : 'aura-2-thalia-en';
 
-                // Initialize playback audio context on user gesture
-                if (!playbackAudioContext) {
-                    playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                if (!playbackContext) {
+                    playbackContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
                 }
-                if (playbackAudioContext.state === 'suspended') {
-                    await playbackAudioContext.resume();
+                if (playbackContext.state === 'suspended') {
+                    await playbackContext.resume();
                 }
-                nextPlayTime = playbackAudioContext.currentTime;
+                nextPlayTime = playbackContext.currentTime;
                 playbackSuppressed = false;
 
-                // 1. Create session via REST API
-                const createRes = await fetch('/api/voice/sessions', {
+                // 1. Create Session
+                const res = await fetch('/api/voice/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: 'web_user', persona: 'companion', voice_model: selectedVoice }),
                 });
-                const sessionData = await createRes.json();
-                const sessionId = sessionData.session_id;
+                const data = await res.json();
+                const sessionId = data.session_id;
 
-                // 2. Connect WebSocket to the created session with selected voice
+                // 2. Connect WebSocket
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/api/voice/ws/${sessionId}?user_id=web_user&voice=${encodeURIComponent(selectedVoice)}`;
 
@@ -785,23 +1482,21 @@
                 ws.binaryType = 'arraybuffer';
 
                 ws.onopen = async () => {
-                    isConnected = true;
-                    updateStatus('CONNECTED');
-                    sessionInfo.textContent = 'Session: ' + sessionId.substring(0, 8);
+                    isSessionActive = true;
+                    setHUDState('CONNECTED');
+                    mainVoiceOrbBtn.classList.add('active-session');
+                    voiceOrbBtnText.textContent = 'Terminate Matrix';
+                    terminalInput.disabled = false;
+                    terminalSendBtn.disabled = false;
 
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    sendBtn.disabled = false;
-                    textInput.disabled = false;
-
-                    await setupMicrophone();
+                    await startMicrophone();
                 };
 
-                ws.onmessage = async (event) => {
-                    if (event.data instanceof ArrayBuffer) {
-                        playAudioChunk(event.data);
+                ws.onmessage = (e) => {
+                    if (e.data instanceof ArrayBuffer) {
+                        playSynthesizedAudio(e.data);
                     } else {
-                        const msg = JSON.parse(event.data);
+                        const msg = JSON.parse(e.data);
                         handleControlMessage(msg);
                     }
                 };
@@ -810,210 +1505,166 @@
                 ws.onerror = (err) => { console.error('WS Error:', err); stopSession(); };
 
             } catch (err) {
-                alert('Microphone access or WebSocket connection failed: ' + err);
+                alert('Session connection failed: ' + err);
+                stopSession();
             }
         };
 
-        stopBtn.onclick = stopSession;
-
-        let playbackSuppressed = false;
-        let isAgentSpeaking = false;
-        let playbackAudioContext = null;
-        let nextPlayTime = 0;
-        let activeAudioSources = [];
-
         function stopSession() {
-            isConnected = false;
+            isSessionActive = false;
             playbackSuppressed = false;
-            isAgentSpeaking = false;
-            updateStatus('DISCONNECTED');
-            sessionInfo.textContent = 'Session: inactive';
+            audioRMS = 0.0;
+            setHUDState('DISCONNECTED');
+            hideToolHolo();
             stopAllAudioPlayback();
-            removeEphemeralActivity();
+
+            mainVoiceOrbBtn.classList.remove('active-session');
+            voiceOrbBtnText.textContent = 'Activate Voice Matrix';
+            terminalInput.disabled = true;
+            terminalSendBtn.disabled = true;
 
             if (ws && ws.readyState === WebSocket.OPEN) ws.close();
             if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
             if (processor) { processor.disconnect(); processor = null; }
-
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            sendBtn.disabled = true;
-            textInput.disabled = true;
         }
 
-        sendBtn.onclick = () => {
-            const text = textInput.value.trim();
-            if (text && ws && ws.readyState === WebSocket.OPEN) {
-                // Typed Interruption: If agent is speaking or playback is active, stop and suppress old audio
-                if (isAgentSpeaking || activeAudioSources.length > 0) {
-                    stopAllAudioPlayback();
-                    playbackSuppressed = false;
-                    isAgentSpeaking = false;
-                }
-                ws.send(JSON.stringify({ type: 'InjectUserMessage', content: text }));
-                appendMessage('user', text);
-                textInput.value = '';
+        terminalSendBtn.onclick = () => {
+            const query = terminalInput.value.trim();
+            if (query && ws && ws.readyState === WebSocket.OPEN) {
+                stopAllAudioPlayback();
+                playbackSuppressed = false;
+                ws.send(JSON.stringify({ type: 'InjectUserMessage', content: query }));
+                dialogueTextStream.textContent = `"${query}"`;
+                appendTranscriptLog('user', query);
+                terminalInput.value = '';
             }
         };
 
-        textInput.onkeydown = (e) => { if (e.key === 'Enter') sendBtn.click(); };
+        terminalInput.onkeydown = (e) => { if (e.key === 'Enter') terminalSendBtn.click(); };
 
         function handleControlMessage(msg) {
             if (msg.type === 'SessionStateChange') {
-                updateStatus(msg.state);
-                if (msg.state === 'DISCONNECTED') {
-                    stopSession();
-                }
+                setHUDState(msg.state);
+                if (msg.state === 'DISCONNECTED') stopSession();
             } else if (msg.type === 'ConversationText') {
-                removeEphemeralActivity();
+                hideToolHolo();
                 if (msg.content && !msg.content.startsWith('Hi, please greet me')) {
-                    appendMessage(msg.role || 'assistant', msg.content);
+                    dialogueTextStream.textContent = msg.content;
+                    appendTranscriptLog(msg.role || 'assistant', msg.content);
                 }
                 if (msg.role === 'assistant') {
                     playbackSuppressed = false;
+                    turnCounter++;
+                    turnsDisplay.textContent = String(turnCounter);
                 }
             } else if (msg.type === 'FunctionCallRequest') {
                 const fns = msg.functions || [{ name: msg.function_name || msg.name, arguments: msg.input || msg.parameters }];
-                if (fns.length > 0) {
-                    showEphemeralActivity(fns[0].name || 'Tool', fns[0].arguments || {});
-                }
+                if (fns.length > 0) showToolHolo(fns[0].name || 'Tool', fns[0].arguments || {});
             } else if (msg.type === 'UserStartedSpeaking') {
-                updateStatus('USER_SPEAKING');
-                isAgentSpeaking = false;
-                stopAllAudioPlayback(); // Instant barge-in: cancel all current audio nodes immediately!
-                playbackSuppressed = true; // Drop late in-flight PCM frames from previous turn
+                setHUDState('USER_SPEAKING');
+                stopAllAudioPlayback();
+                playbackSuppressed = true;
             } else if (msg.type === 'AgentThinking') {
-                updateStatus('THINKING');
-                isAgentSpeaking = false;
-                playbackSuppressed = false; // User finished turn, allow new answer audio
+                setHUDState('THINKING');
+                playbackSuppressed = false;
             } else if (msg.type === 'AgentStartedSpeaking') {
-                updateStatus('SPEAKING');
-                isAgentSpeaking = true;
+                setHUDState('SPEAKING');
                 playbackSuppressed = false;
             } else if (msg.type === 'AgentAudioDone') {
-                updateStatus('LISTENING');
-                isAgentSpeaking = false;
+                setHUDState('LISTENING');
                 playbackSuppressed = false;
-                removeEphemeralActivity();
+                hideToolHolo();
             } else if (msg.type === 'LatencyReport') {
-                console.log('Deepgram LatencyReport telemetry:', msg);
+                if (msg.latency_ms) latencyDisplay.textContent = `${Math.round(msg.latency_ms)} ms`;
             }
         }
 
-        async function setupMicrophone() {
+        async function startMicrophone() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
-            }
+            if (audioContext.state === 'suspended') await audioContext.resume();
 
             micStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: 1,
-                    sampleRate: 16000,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                }
+                audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
             });
 
-            const source = audioContext.createMediaStreamSource(micStream);
+            const src = audioContext.createMediaStreamSource(micStream);
             processor = audioContext.createScriptProcessor(1024, 1, 1);
-
-            source.connect(processor);
+            src.connect(processor);
             processor.connect(audioContext.destination);
 
             processor.onaudioprocess = (e) => {
-                if (!isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
+                if (!isSessionActive || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-                const inputData = e.inputBuffer.getChannelData(0);
-                const pcm16 = new Int16Array(inputData.length);
+                const input = e.inputBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(input.length);
+                let sumSq = 0.0;
 
-                for (let i = 0; i < inputData.length; i++) {
-                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                for (let i = 0; i < input.length; i++) {
+                    const s = Math.max(-1, Math.min(1, input[i]));
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    sumSq += s * s;
+                }
+
+                if (stateLabel.textContent === 'USER SPEAKING') {
+                    audioRMS = Math.min(1.0, Math.sqrt(sumSq / input.length) * 8.0);
                 }
 
                 ws.send(pcm16.buffer);
-                drawWaveform(inputData);
             };
         }
 
         function stopAllAudioPlayback() {
-            activeAudioSources.forEach(source => {
-                try {
-                    source.stop();
-                    source.disconnect();
-                } catch (e) {}
+            activeSources.forEach(s => {
+                try { s.stop(); s.disconnect(); } catch (e) {}
             });
-            activeAudioSources = [];
-            if (playbackAudioContext) {
-                nextPlayTime = playbackAudioContext.currentTime;
-            }
+            activeSources = [];
+            if (playbackContext) nextPlayTime = playbackContext.currentTime;
         }
 
-        function playAudioChunk(arrayBuffer) {
-            if (playbackSuppressed) {
-                return;
+        function playSynthesizedAudio(buffer) {
+            if (playbackSuppressed || !playbackContext) return;
+
+            const pcm16 = new Int16Array(buffer);
+            const float32 = new Float32Array(pcm16.length);
+            let sumSq = 0.0;
+
+            for (let i = 0; i < pcm16.length; i++) {
+                const val = pcm16[i] / 32768.0;
+                float32[i] = val;
+                sumSq += val * val;
             }
 
-            if (!playbackAudioContext) {
-                playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-            }
-            if (playbackAudioContext.state === 'suspended') {
-                void playbackAudioContext.resume();
+            if (stateLabel.textContent === 'SPEAKING') {
+                audioRMS = Math.min(1.0, Math.sqrt(sumSq / pcm16.length) * 7.0);
             }
 
-            const int16View = new Int16Array(arrayBuffer);
-            if (int16View.length === 0) return;
+            const audioBuf = playbackContext.createBuffer(1, float32.length, 24000);
+            audioBuf.getChannelData(0).set(float32);
 
-            const float32Data = new Float32Array(int16View.length);
-            for (let i = 0; i < int16View.length; i++) {
-                float32Data[i] = int16View[i] / 32768.0;
-            }
+            const source = playbackContext.createBufferSource();
+            source.buffer = audioBuf;
+            source.connect(playbackContext.destination);
 
-            const audioBuffer = playbackAudioContext.createBuffer(1, float32Data.length, 24000);
-            audioBuffer.getChannelData(0).set(float32Data);
+            const now = playbackContext.currentTime;
+            const startTime = Math.max(now, nextPlayTime);
+            source.start(startTime);
+            nextPlayTime = startTime + audioBuf.duration;
 
-            const source = playbackAudioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(playbackAudioContext.destination);
-
-            const currentTime = playbackAudioContext.currentTime;
-            if (nextPlayTime < currentTime) {
-                nextPlayTime = currentTime;
-            }
-            source.start(nextPlayTime);
-            nextPlayTime += audioBuffer.duration;
-
-            activeAudioSources.push(source);
+            activeSources.push(source);
             source.onended = () => {
-                const idx = activeAudioSources.indexOf(source);
-                if (idx !== -1) activeAudioSources.splice(idx, 1);
+                const idx = activeSources.indexOf(source);
+                if (idx > -1) activeSources.splice(idx, 1);
+                if (activeSources.length === 0) audioRMS = 0.0;
             };
         }
 
-        function drawWaveform(data) {
-            canvasCtx.fillStyle = '#080c14';
-            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-            canvasCtx.lineWidth = 2;
-            canvasCtx.strokeStyle = '#3b82f6';
-            canvasCtx.beginPath();
-
-            const sliceWidth = canvas.width * 1.0 / data.length;
-            let x = 0;
-
-            for (let i = 0; i < data.length; i += 8) {
-                const v = data[i] * 2;
-                const y = (canvas.height / 2) + (v * (canvas.height / 2));
-
-                if (i === 0) canvasCtx.moveTo(x, y);
-                else canvasCtx.lineTo(x, y);
-
-                x += sliceWidth * 8;
-            }
-
-            canvasCtx.stroke();
-        }
+        // ==============================================================
+        // 4. BOOTSTRAP INIT
+        // ==============================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            init3D();
+            void fetchAndRenderConnectors();
+        });
     </script>
 </body>
 </html>
