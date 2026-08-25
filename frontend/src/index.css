@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --shinra-bg: #09090b;
+    --shinra-surface: #121215;
+    --shinra-surface-elevated: #18181c;
+    --shinra-border: rgba(255, 255, 255, 0.08);
+    --shinra-border-hover: rgba(255, 255, 255, 0.16);
+    --shinra-border-active: rgba(16, 185, 129, 0.4);
+
+    --shinra-emerald: #10B981;
+    --shinra-emerald-glow: 0 0 24px rgba(16, 185, 129, 0.35);
+    --shinra-emerald-subtle: rgba(16, 185, 129, 0.08);
+
+    --shinra-text-primary: #FFFFFF;
+    --shinra-text-secondary: #A1A1AA;
+    --shinra-text-muted: #71717A;
+
+    --font-display: 'Syne', -apple-system, sans-serif;
+    --font-ui: 'Space Grotesk', -apple-system, sans-serif;
+    --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--shinra-bg);
+    color: #F4F4F5;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+}
+
+/* Luxury Glassmorphic Panels */
+.shinra-card {
+  background: rgba(18, 18, 22, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--shinra-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s var(--ease-fluid);
+}
+
+.shinra-card:hover {
+  border-color: var(--shinra-border-hover);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 20px 48px rgba(0, 0, 0, 0.6);
+}
+
+.shinra-pill {
+  background: rgba(24, 24, 28, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--shinra-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Animations */
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.05); }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 3s infinite ease-in-out;
+}
+
+/* Clean Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
