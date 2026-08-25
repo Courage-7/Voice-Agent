@@ -2,9 +2,11 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -17,6 +19,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("voice_agent")
+
+FRONTEND_ASSETS_PATH = Path(__file__).resolve().parents[2] / "frontend" / "dist" / "assets"
 
 
 @asynccontextmanager
@@ -52,5 +56,9 @@ app.add_middleware(
 # 1. Mount Central REST API Router (/api/...)
 app.include_router(api_router)
 
-# 2. Mount Playground UI (/, /playground)
+# 2. Mount Static Assets from Frontend Build if available
+if FRONTEND_ASSETS_PATH.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS_PATH)), name="assets")
+
+# 3. Mount Main Frontend and Playground UI (/, /playground)
 app.include_router(playground_router)
