@@ -7,6 +7,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Node & Frontend
+node_modules/
+dist/
+.vite/
+
 # Environments and variables
 .env
 .venv
@@ -17,7 +22,6 @@ ENV/
 # Distribution / Packaging
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
