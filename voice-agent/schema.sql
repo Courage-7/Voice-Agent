@@ -1,6 +1,4 @@
--- ==============================================================================
 -- Voice AI Agent: Supabase PostgreSQL Database Schema with Row Level Security
--- ==============================================================================
 
 -- 1. Enable Required Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
