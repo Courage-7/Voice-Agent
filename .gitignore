@@ -9,7 +9,8 @@ htmlcov/
 
 # Node & Frontend
 node_modules/
-
+dist/
+.vite/
 
 # Environments and variables
 .env
