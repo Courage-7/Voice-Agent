@@ -2,7 +2,6 @@
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,18 +19,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("voice_agent")
 
-FRONTEND_ASSETS_PATH = Path(__file__).resolve().parents[2] / "frontend" / "dist" / "assets"
+FRONTEND_ASSETS_PATH = settings.frontend_dist_path / "assets"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup setup and graceful shutdown."""
     logger.info("Initializing Voice AI Agent...")
+    from app.db.session import db_gateway
+    await db_gateway.connect()
+
+    if settings.demo_mode:
+        logger.warning("DEMO MODE: external providers are disabled; local data is temporary.")
+    if settings.environment == "production":
+        if not (settings.frontend_dist_path / "index.html").is_file() or not FRONTEND_ASSETS_PATH.is_dir():
+            raise RuntimeError("Production frontend is missing. Build the frontend and set FRONTEND_DIST_PATH.")
+        from app.integrations.composio.client import composio_gateway
+        from app.integrations.llm.client import groq_client
+        if composio_gateway._client is None or groq_client._client is None or not db_gateway.is_connected:
+            raise RuntimeError("A required production provider failed to initialize; startup refused.")
     logger.info(f"Loaded {len(tool_registry.get_all_tools())} tools into registry.")
     logger.info(f"Using Groq LLM model: {settings.groq_model}")
     logger.info(f"Using Deepgram STT/TTS: {settings.deepgram_stt_model} / {settings.deepgram_tts_model}")
     yield
     logger.info("Shutting down Voice AI Agent...")
+    await db_gateway.disconnect()
 
 
 app = FastAPI(
@@ -47,7 +59,7 @@ app = FastAPI(
 # CORS middleware for Web / UI clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

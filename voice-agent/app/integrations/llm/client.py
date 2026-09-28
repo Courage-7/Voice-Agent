@@ -1,7 +1,7 @@
 """Groq LLM Client Adapter for ultra-low latency LPU inference."""
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 
 from app.core.config import settings
 
@@ -17,6 +17,8 @@ class GroqLLMClient:
         self._initialize()
 
     def _initialize(self) -> None:
+        if settings.demo_mode:
+            return
         if not self.api_key:
             logger.warning("GROQ_API_KEY is not set. Groq client running in fallback mode.")
             return
@@ -38,7 +40,10 @@ class GroqLLMClient:
         """Stream token responses from Groq LPU."""
         selected_model = model or settings.groq_model
         if not self._client:
-            yield "I am ready to help you with your voice queries."
+            if settings.demo_mode:
+                yield "This is a demo response. Live reasoning is disabled."
+            else:
+                raise RuntimeError("Groq is unavailable; no model response was generated.")
             return
 
         try:

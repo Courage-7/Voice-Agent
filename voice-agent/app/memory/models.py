@@ -1,7 +1,6 @@
 """Memory data models and schemas."""
 
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -15,4 +14,6 @@ class MemoryRecord(BaseModel):
     content: str
     category: str = "general"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     confidence: float = 1.0
+    source: str = "conversation"

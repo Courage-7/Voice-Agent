@@ -22,7 +22,7 @@ class ToolExecutionError(VoiceAgentException):
 
 
 class MemoryRepositoryError(VoiceAgentException):
-    """Raised when Supabase or memory store access fails."""
+    """Raised when database or memory store access fails."""
     pass
 
 

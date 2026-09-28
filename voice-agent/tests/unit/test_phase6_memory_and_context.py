@@ -30,10 +30,11 @@ async def test_memory_summary_retrieval_and_prompt_injection():
     session._is_running = True
 
     await session._send_settings_configuration()
-    assert mock_ws.send.called
-    sent_payload = json.loads(mock_ws.send.call_args[0][0])
+    await asyncio.gather(*session._tool_tasks)
+    sent_payloads = [json.loads(call.args[0]) for call in mock_ws.send.call_args_list]
+    sent_payload = next(payload for payload in sent_payloads if payload["type"] == "UpdatePrompt")
 
-    prompt = sent_payload["agent"]["think"]["prompt"]
+    prompt = sent_payload["prompt"]
     assert "RELEVANT USER MEMORIES & PREFERENCES" in prompt
     assert "Prefers morning meetings" in prompt
     assert "Lives in Seattle" in prompt
@@ -54,8 +55,10 @@ async def test_user_profile_context_injection():
     session._is_running = True
 
     await session._send_settings_configuration()
-    sent_payload = json.loads(mock_ws.send.call_args[0][0])
-    prompt = sent_payload["agent"]["think"]["prompt"]
+    await asyncio.gather(*session._tool_tasks)
+    sent_payloads = [json.loads(call.args[0]) for call in mock_ws.send.call_args_list]
+    sent_payload = next(payload for payload in sent_payloads if payload["type"] == "UpdatePrompt")
+    prompt = sent_payload["prompt"]
 
     assert "USER PROFILE & CONTEXT" in prompt
     assert "Samantha Ray" in prompt

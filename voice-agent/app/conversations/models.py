@@ -1,10 +1,10 @@
 """Conversation models and turn records."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class ConversationMessage(BaseModel):
@@ -25,3 +25,19 @@ class ConversationSession(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     messages: List[ConversationMessage] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @computed_field
+    @property
+    def id(self) -> str:
+        return self.session_id
+
+    @computed_field
+    @property
+    def title(self) -> str:
+        if self.metadata and self.metadata.get("title"):
+            return self.metadata["title"]
+        for m in self.messages:
+            if m.role == "user" and m.content:
+                clean = m.content.strip()
+                return clean[:45] + ("..." if len(clean) > 45 else "")
+        return f"Voice Session {self.session_id[:8]}"

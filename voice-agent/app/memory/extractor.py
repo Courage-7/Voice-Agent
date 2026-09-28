@@ -1,7 +1,7 @@
 """Structured memory extraction using LangChain and Groq."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.core.config import settings

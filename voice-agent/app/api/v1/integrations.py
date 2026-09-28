@@ -1,14 +1,15 @@
-"""Composio OAuth integrations and action execution router."""
+"""Composio OAuth integrations and action execution router with verified user identity."""
 
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from app.auth.models import AuthUser
+from app.core.dependencies import get_current_user, get_optional_user
 from app.integrations.composio.client import composio_gateway
 from app.tools.registry import tool_registry
 
 router = APIRouter()
-USER_ENTITY_DESC = "User or Entity ID"
 
 
 class DirectActionRequest(BaseModel):
@@ -20,14 +21,19 @@ class DirectActionRequest(BaseModel):
 @router.get("/apps")
 async def get_supported_apps():
     """List all supported ecosystem apps (Gmail, Outlook, Calendar, SerpAI, Perplexity, Workspace)."""
-    return {"apps": composio_gateway.get_supported_apps()}
+    try:
+        return {"apps": composio_gateway.get_supported_apps()}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/status")
-async def get_connection_status(user_id: str = Query("default_user", description=USER_ENTITY_DESC)):
-    """Get list of active connected OAuth accounts for the user."""
-    accounts = await composio_gateway.get_connected_accounts(entity_id=user_id)
-    return {"user_id": user_id, "connected_accounts": accounts}
+async def get_connection_status(current_user: AuthUser = Depends(get_current_user)):
+    """Get list of active connected OAuth accounts for the authenticated user."""
+    # This endpoint drives the post-OAuth polling UI.  It must report the
+    # provider's current state, not a pre-consent cache entry.
+    accounts = await composio_gateway.get_connected_accounts(entity_id=current_user.id, force_refresh=True)
+    return {"user_id": current_user.id, "connected_accounts": accounts}
 
 
 @router.get(
@@ -39,13 +45,13 @@ async def get_connection_status(user_id: str = Query("default_user", description
 )
 async def initiate_oauth(
     app_name: str,
-    user_id: str = Query("default_user", description=USER_ENTITY_DESC),
     redirect_uri: Optional[str] = Query(None, description="Optional custom post-OAuth redirect URI"),
+    current_user: AuthUser = Depends(get_current_user),
 ):
-    """Generate OAuth authorization URL to connect an external app."""
+    """Generate OAuth authorization URL bound to the authenticated user's entity ID."""
     result = await composio_gateway.initiate_connection(
         app_name=app_name,
-        entity_id=user_id,
+        entity_id=current_user.id,
         redirect_uri=redirect_uri,
     )
     if not result.get("success"):
@@ -54,7 +60,7 @@ async def initiate_oauth(
 
 
 @router.get("/callback", response_class=HTMLResponse)
-async def oauth_callback(status: Optional[str] = None):
+async def oauth_callback(_status: Optional[str] = None):
     """OAuth callback page shown after completing OAuth consent in popup."""
     return HTMLResponse(content="""
     <html>
@@ -77,45 +83,82 @@ async def oauth_callback(status: Optional[str] = None):
         400: {"description": "Failed to disconnect connection."},
     },
 )
-async def disconnect_integration(connection_id: str):
+async def disconnect_integration(
+    connection_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """Revoke and disconnect an integrated account."""
-    res = await composio_gateway.disconnect_account(connection_id)
+    res = await composio_gateway.disconnect_account(connection_id, entity_id=current_user.id)
     if not res.get("success"):
+        if res.get("status") == "authorization_error":
+            raise HTTPException(status_code=403, detail=res.get("error", "Connection ownership check failed"))
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to disconnect"))
     return res
 
 
 @router.get("/tools")
-async def get_user_scoped_tools(user_id: str = Query("default_user", description=USER_ENTITY_DESC)):
-    """Dynamically return tool schemas scoped only to the user's active connected capabilities."""
-    accounts = await composio_gateway.get_connected_accounts(entity_id=user_id)
+async def get_user_scoped_tools(current_user: AuthUser = Depends(get_current_user)):
+    """Dynamically return tool schemas scoped only to the authenticated user's active capabilities."""
+    accounts = await composio_gateway.get_connected_accounts(entity_id=current_user.id)
     active_caps = {"system", "memory"}
 
     for acc in accounts:
-        app_name = (acc.get("app") or "").upper()
+        if (acc.get("status") or "").upper() != "ACTIVE" and not acc.get("is_active"):
+            continue
+        app_name = (acc.get("app") or "").upper().replace("-", "_")
         if app_name in ["GMAIL", "OUTLOOK"]:
             active_caps.add("email")
         elif app_name in ["GOOGLECALENDAR", "OUTLOOK"]:
             active_caps.add("calendar")
-        elif app_name in ["SERPAPI", "PERPLEXITYAI"]:
+        elif app_name in ["SERPAPI", "PERPLEXITYAI", "TAVILY"]:
             active_caps.add("search")
-        elif app_name in ["GOOGLESHEETS", "GOOGLEDOCS", "GOOGLEDRIVE"]:
+        elif app_name in [
+            "GOOGLESHEETS", "GOOGLEDOCS", "GOOGLEDRIVE", "NOTION",
+            "MICROSOFT_TEAMS", "WHATSAPP", "TELEGRAM", "LINKEDIN",
+            "NEON", "I_LOVE_PDF"
+        ]:
             active_caps.add("workspace")
 
     scoped_schemas = tool_registry.get_deepgram_function_schemas(capabilities=list(active_caps))
     return {
-        "user_id": user_id,
+        "user_id": current_user.id,
         "active_capabilities": list(active_caps),
         "tools_count": len(scoped_schemas),
         "tools": scoped_schemas,
     }
 
 
-@router.post("/execute")
-async def execute_action(payload: DirectActionRequest):
-    """Directly test-execute a Composio action for a connected user entity."""
+@router.post(
+    "/execute",
+    responses={
+        401: {"description": "Authentication required to execute actions."},
+        403: {"description": "Direct write execution is restricted by policy."},
+    },
+)
+async def execute_action(
+    payload: DirectActionRequest,
+    current_user: Optional[AuthUser] = Depends(get_optional_user),
+):
+    """Execute a Composio action with write policy enforcement and verified identity binding."""
+    # 1. Reject writes through direct execution gateway
+    action_upper = payload.action_name.upper()
+    is_write = any(w in action_upper for w in ("SEND", "CREATE", "APPEND", "UPDATE", "DELETE", "INSERT", "BOOK", "DISPATCH"))
+    if is_write:
+        raise HTTPException(
+            status_code=403,
+            detail="Direct write execution is restricted by policy. Write operations must be confirmed through the voice agent safety gateway.",
+        )
+
+    # 2. Require authentication for read actions
+    if not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to execute actions.",
+        )
+
+    # 3. Strictly bind entity_id to verified authenticated caller
     return await composio_gateway.execute_action(
         action_name=payload.action_name,
         params=payload.params,
-        entity_id=payload.entity_id,
+        entity_id=current_user.id,
     )

@@ -108,10 +108,18 @@ class MetricsCollector:
 
         # Latency metrics
         total_p50 = self._calc_percentiles(self.total_latencies)["p50"]
+        total_p95 = self._calc_percentiles(self.total_latencies)["p95"]
+        total_p99 = self._calc_percentiles(self.total_latencies)["p99"]
         lines.append("")
         lines.append("# HELP voice_agent_roundtrip_latency_p50_ms Round-trip latency p50 in milliseconds")
         lines.append("# TYPE voice_agent_roundtrip_latency_p50_ms gauge")
         lines.append(f"voice_agent_roundtrip_latency_p50_ms {total_p50}")
+        lines.append("# HELP voice_agent_roundtrip_latency_p95_ms Round-trip latency p95 in milliseconds")
+        lines.append("# TYPE voice_agent_roundtrip_latency_p95_ms gauge")
+        lines.append(f"voice_agent_roundtrip_latency_p95_ms {total_p95}")
+        lines.append("# HELP voice_agent_roundtrip_latency_p99_ms Round-trip latency p99 in milliseconds")
+        lines.append("# TYPE voice_agent_roundtrip_latency_p99_ms gauge")
+        lines.append(f"voice_agent_roundtrip_latency_p99_ms {total_p99}")
 
         return "\n".join(lines) + "\n"
 
