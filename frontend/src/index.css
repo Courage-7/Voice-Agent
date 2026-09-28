@@ -2,75 +2,200 @@
 
 @layer base {
   :root {
-    --shinra-bg: #09090b;
-    --shinra-surface: #121215;
-    --shinra-surface-elevated: #18181c;
-    --shinra-border: rgba(255, 255, 255, 0.08);
-    --shinra-border-hover: rgba(255, 255, 255, 0.16);
-    --shinra-border-active: rgba(16, 185, 129, 0.4);
+    --color-canvas: #faf9f6;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f3f1ec;
+    --color-surface-dark: #1e1e24;
+    --color-surface-dark-elevated: #2b2b34;
+    --color-ink: #0f172a;
+    --color-body: #334155;
+    --color-muted: #64748b;
+    --color-faint: #94a3b8;
+    --color-hairline: #e2dfd7;
+    --color-focus: #b95740;
+    --color-action: #b95740;
+    --color-action-active: #9b4430;
+    --color-link: #2563eb;
+    --color-success: #15803d;
+    --color-warning: #b45309;
+    --color-danger: #b91c1c;
+    --color-on-dark: #ffffff;
+    --color-on-action: #ffffff;
 
-    --shinra-emerald: #10B981;
-    --shinra-emerald-glow: 0 0 24px rgba(16, 185, 129, 0.35);
-    --shinra-emerald-subtle: rgba(16, 185, 129, 0.08);
-
-    --shinra-text-primary: #FFFFFF;
-    --shinra-text-secondary: #A1A1AA;
-    --shinra-text-muted: #71717A;
-
-    --font-display: 'Syne', -apple-system, sans-serif;
-    --font-ui: 'Space Grotesk', -apple-system, sans-serif;
-    --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
 
     --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   body {
     font-family: var(--font-body);
-    background-color: var(--shinra-bg);
-    color: #F4F4F5;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
     overflow: hidden;
     height: 100vh;
     width: 100vw;
+    margin: 0;
+    padding: 0;
   }
 }
 
-/* Luxury Glassmorphic Panels */
-.shinra-card {
-  background: rgba(18, 18, 22, 0.7);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--shinra-border);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s var(--ease-fluid);
+/* Calm studio canvas without decorative gradients or sci-fi glows */
+.studio-canvas {
+  background-color: var(--color-canvas);
 }
 
-.shinra-card:hover {
-  border-color: var(--shinra-border-hover);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 20px 48px rgba(0, 0, 0, 0.6);
+/* Clean operational card surface with hairline border */
+.studio-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease;
 }
 
-.shinra-pill {
-  background: rgba(24, 24, 28, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--shinra-border);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.4);
+.studio-card:hover {
+  border-color: var(--color-muted);
 }
 
-/* Animations */
-@keyframes pulseSubtle {
-  0%, 100% { opacity: 0.9; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.05); }
+/* Stable flat container fallback */
+.studio-pill {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
 }
 
-.animate-pulse-subtle {
-  animation: pulseSubtle 3s infinite ease-in-out;
+/* Equalizer Bars for Audio Synthesis */
+@keyframes barFluctuate {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+  50% { height: 18px; }
 }
 
-/* Clean Custom Scrollbar */
+.eq-active-1 { animation: barFluctuate 0.7s ease-in-out infinite; }
+.eq-active-2 { animation: barFluctuate 1.0s ease-in-out infinite 0.15s; }
+.eq-active-3 { animation: barFluctuate 0.8s ease-in-out infinite 0.3s; }
+.eq-active-4 { animation: barFluctuate 1.2s ease-in-out infinite 0.1s; }
+.eq-active-5 { animation: barFluctuate 0.9s ease-in-out infinite 0.25s; }
+
+/* Clean Scrollbar */
+/* Voice Agent Hero Animations */
+@keyframes acousticPulse {
+  0% {
+    transform: scale(0.97);
+    box-shadow: 0 0 0 0 rgba(185, 87, 64, 0.4), 0 0 35px 2px rgba(185, 87, 64, 0.2);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 16px rgba(185, 87, 64, 0), 0 0 50px 10px rgba(185, 87, 64, 0.35);
+  }
+  100% {
+    transform: scale(0.97);
+    box-shadow: 0 0 0 0 rgba(185, 87, 64, 0.4), 0 0 35px 2px rgba(185, 87, 64, 0.2);
+  }
+}
+
+@keyframes ringExpand {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes ringExpandDelayed {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.5deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(7px) rotate(-0.5deg);
+  }
+}
+
+@keyframes soundwaveDance {
+  0%, 100% {
+    height: 6px;
+    opacity: 0.5;
+  }
+  50% {
+    height: 32px;
+    opacity: 1;
+  }
+}
+
+@keyframes voiceGlowRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-acoustic-pulse {
+  animation: acousticPulse 3.2s ease-in-out infinite;
+}
+
+.animate-ring-expand {
+  animation: ringExpand 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.animate-ring-expand-delayed {
+  animation: ringExpandDelayed 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite 1.7s;
+}
+
+.animate-float-slow {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 6s ease-in-out infinite 0.5s;
+}
+
+.animate-glow-rotate {
+  animation: voiceGlowRotate 20s linear infinite;
+}
+
+/* Tactile, Visible Native & Webkit Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 43, 38, 0.25) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -78,10 +203,26 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-hairline);
   border-radius: 4px;
+  background: rgba(45, 43, 38, 0.22);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--color-muted);
+  background: rgba(45, 43, 38, 0.5);
+  background-clip: content-box;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

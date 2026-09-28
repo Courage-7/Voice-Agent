@@ -12,14 +12,15 @@ interface ConnectorsDrawerProps {
 }
 
 const APP_ICONS: Record<string, React.ReactNode> = {
-  GMAIL: <Mail className="w-4 h-4 text-[#EA4335]" />,
-  OUTLOOK: <Mail className="w-4 h-4 text-[#0078D4]" />,
-  GOOGLECALENDAR: <Calendar className="w-4 h-4 text-[#4285F4]" />,
-  GOOGLESHEETS: <Table className="w-4 h-4 text-[#0F9D58]" />,
-  GOOGLEDOCS: <FileText className="w-4 h-4 text-[#4285F4]" />,
-  GOOGLEDRIVE: <HardDrive className="w-4 h-4 text-[#FFC107]" />,
-  SERPAPI: <Search className="w-4 h-4 text-[#4285F4]" />,
-  PERPLEXITYAI: <Sparkles className="w-4 h-4 text-[#22D3EE]" />,
+  GMAIL: <Mail className="w-4 h-4 text-red-600" />,
+  OUTLOOK: <Mail className="w-4 h-4 text-blue-600" />,
+  GOOGLECALENDAR: <Calendar className="w-4 h-4 text-amber-600" />,
+  GOOGLESHEETS: <Table className="w-4 h-4 text-emerald-600" />,
+  GOOGLEDOCS: <FileText className="w-4 h-4 text-blue-600" />,
+  GOOGLEDRIVE: <HardDrive className="w-4 h-4 text-amber-600" />,
+  SERPAPI: <Search className="w-4 h-4 text-blue-600" />,
+  PERPLEXITYAI: <Sparkles className="w-4 h-4 text-purple-600" />,
+  TAVILY: <Search className="w-4 h-4 text-sky-600" />,
 };
 
 export const ConnectorsDrawer: React.FC<ConnectorsDrawerProps> = ({
@@ -30,87 +31,122 @@ export const ConnectorsDrawer: React.FC<ConnectorsDrawerProps> = ({
   onConnect,
   onDisconnect,
 }) => {
-  return (
-    <aside
-      className={`fixed top-5 bottom-6 left-7 w-[380px] glass-drawer rounded-3xl p-5 flex flex-col gap-4 z-20 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        isOpen ? 'translate-x-0 opacity-100 pointer-events-auto' : '-translate-x-[calc(100%+40px)] opacity-0 pointer-events-none'
-      }`}
-    >
-      {/* Drawer Header */}
-      <div className="flex justify-between items-center pb-3 border-b border-white/10">
-        <div className="font-['Syne'] text-[14px] font-extrabold tracking-wider uppercase text-white flex items-center gap-2">
-          <Network className="w-4 h-4 text-[#00F0FF]" />
-          <span>Connector Nodes</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-7 h-7 rounded-full bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center hover:bg-white/15 transition-all cursor-pointer"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+  if (!isOpen) return null;
+
+  let content: React.ReactNode;
+  if (loading) {
+    content = (
+      <div className="text-center py-8 text-[var(--color-muted)] font-mono text-[11px] animate-pulse">
+        Discovering connector nodes...
       </div>
+    );
+  } else if (connectors.length === 0) {
+    content = (
+      <div className="text-center py-8 text-[var(--color-muted)] text-[12px]">
+        No connectors configured
+      </div>
+    );
+  } else {
+    content = connectors.map((app) => {
+      const key = (app.name || '').toUpperCase();
+      const icon = APP_ICONS[key] || <Network className="w-4 h-4 text-[var(--color-action)]" />;
 
-      {/* Drawer Content Feed */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
-        {loading ? (
-          <div className="text-center py-8 text-slate-400 font-['JetBrains_Mono'] text-[11px] animate-pulse">
-            DISCOVERING COMPOSIO NODES...
-          </div>
-        ) : connectors.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 font-['JetBrains_Mono'] text-[11px]">
-            NO CONNECTORS CONFIGURED
-          </div>
-        ) : (
-          connectors.map((app) => {
-            const key = (app.name || '').toUpperCase();
-            const icon = APP_ICONS[key] || <Network className="w-4 h-4 text-[#00F0FF]" />;
-
-            return (
+      return (
+        <div
+          key={key}
+          className={`bg-[var(--color-surface)] border rounded-xl p-3.5 flex items-center justify-between gap-3 transition-all shadow-xs ${
+            app.connected
+              ? 'border-[var(--color-success)]/40 hover:border-[var(--color-success)]'
+              : 'border-[var(--color-hairline)] hover:border-[var(--color-muted)]'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-[var(--color-surface-muted)] border border-[var(--color-hairline)] flex items-center justify-center shrink-0">
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold text-[var(--color-ink)] truncate">
+                {app.display_name || app.name}
+              </div>
               <div
-                key={key}
-                className={`bg-[#040914]/65 border border-white/7 rounded-xl p-3 flex items-center justify-between gap-3 transition-all duration-200 hover:border-[#00F0FF]/30 hover:bg-[#081024]/85 hover:-translate-y-0.5 ${
-                  app.connected ? 'border-l-[3px] border-l-[#00FF9D]' : ''
+                className={`font-mono text-[10.5px] flex items-center gap-1.5 mt-0.5 ${
+                  app.connected ? 'text-[var(--color-success)] font-medium' : 'text-[var(--color-muted)]'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    {icon}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-['Space_Grotesk'] text-[13px] font-bold text-white truncate">
-                      {app.display_name || app.name}
-                    </div>
-                    <div
-                      className={`font-['JetBrains_Mono'] text-[10px] flex items-center gap-1.5 ${
-                        app.connected ? 'text-[#00FF9D]' : 'text-slate-400'
-                      }`}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      <span>{app.connected ? 'ONLINE / CONNECTED' : 'STANDBY'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {app.connected ? (
-                  <button
-                    onClick={() => onDisconnect(app.connection_id || key)}
-                    className="px-2.5 py-1.5 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/30 text-[#FFA4B8] font-['JetBrains_Mono'] text-[10.5px] font-bold tracking-wider hover:bg-[#FF3366] hover:text-white transition-all cursor-pointer flex-shrink-0"
-                  >
-                    DISCONNECT
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onConnect(app.name)}
-                    className="px-2.5 py-1.5 rounded-lg bg-[#00F0FF]/15 border border-[#00F0FF]/35 text-[#00F0FF] font-['JetBrains_Mono'] text-[10.5px] font-bold tracking-wider hover:bg-[#00F0FF] hover:text-[#020408] transition-all cursor-pointer flex-shrink-0"
-                  >
-                    CONNECT
-                  </button>
-                )}
+                <span className={`w-1.5 h-1.5 rounded-full ${app.connected ? 'bg-[var(--color-success)]' : 'bg-[var(--color-muted)]'}`} />
+                <span>{app.connected ? 'ONLINE / CONNECTED' : 'STANDBY'}</span>
               </div>
-            );
-          })
-        )}
-      </div>
-    </aside>
+            </div>
+          </div>
+
+          {app.connected ? (
+            <button
+              onClick={() => onDisconnect(app.connection_id || key)}
+              className="px-2.5 py-1 rounded-md border border-[var(--color-hairline)] text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-[#fcf0f0] text-[11px] font-medium transition-colors cursor-pointer shrink-0"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              onClick={() => onConnect(app.name)}
+              className="px-3 py-1 rounded-md bg-[var(--color-action)] hover:bg-[var(--color-action-active)] text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 shadow-xs"
+            >
+              Connect
+            </button>
+          )}
+        </div>
+      );
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className="fixed inset-0 bg-black/25 transition-opacity duration-200"
+        aria-hidden="true"
+      />
+
+      {/* Slide-Over Panel */}
+      <aside
+        role="dialog"
+        aria-label="Connector nodes"
+        className="relative w-full sm:w-[460px] h-full bg-[var(--color-surface)] border-l border-[var(--color-hairline)] shadow-xl z-10 flex flex-col p-5 gap-4 animate-in slide-in-from-right duration-200"
+      >
+        {/* Drawer Header */}
+        <div className="flex justify-between items-center pb-3 border-b border-[var(--color-hairline)] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-md bg-[var(--color-surface-muted)] border border-[var(--color-hairline)] flex items-center justify-center text-[var(--color-muted)]">
+              <Network className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-['DM_Serif_Display'] text-[17px] text-[var(--color-ink)] leading-none">
+                Workspace Connectors
+              </div>
+              <div className="font-mono text-[11px] text-[var(--color-muted)] mt-0.5">
+                Manage integrated data sources and applications
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            title="Close panel"
+            aria-label="Close panel"
+            className="w-8 h-8 rounded-md hover:bg-[var(--color-surface-muted)] text-[var(--color-muted)] hover:text-[var(--color-ink)] flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Drawer Content Feed */}
+        <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
+          {content}
+        </div>
+      </aside>
+    </div>
   );
 };
+
+export default ConnectorsDrawer;
