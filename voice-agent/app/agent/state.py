@@ -1,6 +1,6 @@
 """LangGraph agent state schema."""
 
-from typing import Annotated, Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict
 
 
@@ -16,3 +16,4 @@ class AgentState(TypedDict):
     tool_result: Optional[Dict[str, Any]]
     response_text: str
     error: Optional[str]
+    integration_handled: bool

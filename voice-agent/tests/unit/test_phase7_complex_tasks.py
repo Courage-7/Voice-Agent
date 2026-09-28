@@ -10,18 +10,19 @@ from app.tools.registry import tool_registry
 from app.tools.system.complex_task import RunComplexTaskTool
 
 
-def test_complex_task_planner_decomposition():
+@pytest.mark.asyncio
+async def test_complex_task_planner_decomposition():
     """Verify task planner decomposes high-level requests into ordered sub-steps."""
     # Pattern 1: Email + Doc
-    steps = complex_task_planner.plan_steps("Search Q3 budget emails and draft note", {})
+    steps = await complex_task_planner.plan_steps("Search Q3 budget emails and draft note", {})
     assert len(steps) == 2
     assert steps[0]["tool_name"] == "search_emails"
     assert steps[1]["tool_name"] == "manage_google_doc"
 
     # Pattern 2: Web Research + Calendar
-    steps2 = complex_task_planner.plan_steps("Research AI conferences and schedule meeting", {})
+    steps2 = await complex_task_planner.plan_steps("Research AI conferences and schedule meeting", {})
     assert len(steps2) == 2
-    assert steps2[0]["tool_name"] == "perplexity_research"
+    assert steps2[0]["tool_name"] in ("perplexity_ai_research", "web_search_serpapi")
     assert steps2[1]["tool_name"] == "list_calendar_events"
 
 

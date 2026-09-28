@@ -1,10 +1,11 @@
-"""LangGraph state graph definition and compilation with graceful fallback."""
+"""LangGraph state graph definition for the server-side execution owner."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.agent.nodes.execute_tool import execute_tool_node
 from app.agent.nodes.load_context import load_context_node
+from app.agent.nodes.resolve_integrations import resolve_integrations_node
 from app.agent.nodes.reason import reason_node
 from app.agent.nodes.respond import respond_node
 from app.agent.state import AgentState
@@ -12,73 +13,49 @@ from app.agent.state import AgentState
 logger = logging.getLogger(__name__)
 
 
-class FallbackAgentRunner:
-    """Fallback runner when langgraph package is not yet installed."""
-
-    async def ainvoke(self, state: AgentState) -> AgentState:
-        current_state = dict(state)
-
-        # 1. Load context
-        ctx = await load_context_node(current_state)
-        current_state.update(ctx)
-
-        # 2. Reason
-        reason_res = await reason_node(current_state)
-        current_state.update(reason_res)
-
-        # 3. Tool execution if active
-        if current_state.get("active_tool_call"):
-            tool_res = await execute_tool_node(current_state)
-            current_state.update(tool_res)
-            # Second reason turn
-            reason_res2 = await reason_node(current_state)
-            current_state.update(reason_res2)
-
-        # 4. Respond
-        respond_res = await respond_node(current_state)
-        current_state.update(respond_res)
-
-        return current_state
-
-
 def build_agent_graph() -> Any:
-    """Build and compile the multi-turn conversational LangGraph."""
-    try:
-        from langgraph.graph import END, StateGraph
+    """Build the authoritative multi-turn conversational LangGraph.
 
-        builder = StateGraph(AgentState)
+    LangGraph is a required runtime dependency.  A silent procedural fallback
+    would create a second, differently-behaving execution engine.
+    """
+    from langgraph.graph import END, StateGraph
 
-        # Add Nodes
-        builder.add_node("load_context", load_context_node)
-        builder.add_node("reason", reason_node)
-        builder.add_node("execute_tool", execute_tool_node)
-        builder.add_node("respond", respond_node)
+    builder = StateGraph(AgentState)
 
-        # Set Entry Point
-        builder.set_entry_point("load_context")
+    builder.add_node("load_context", load_context_node)
+    builder.add_node("resolve_integrations", resolve_integrations_node)
+    builder.add_node("reason", reason_node)
+    builder.add_node("execute_tool", execute_tool_node)
+    builder.add_node("respond", respond_node)
 
-        # Connect Edges
-        builder.add_edge("load_context", "reason")
+    builder.set_entry_point("load_context")
+    builder.add_edge("load_context", "resolve_integrations")
 
-        def route_reason_output(state: AgentState) -> str:
-            if state.get("active_tool_call"):
-                return "execute_tool"
-            return "respond"
+    def route_integration_resolution(state: AgentState) -> str:
+        return "respond" if state.get("integration_handled") else "reason"
 
-        builder.add_conditional_edges(
-            "reason",
-            route_reason_output,
-            {"execute_tool": "execute_tool", "respond": "respond"},
-        )
-        builder.add_edge("execute_tool", "reason")
-        builder.add_edge("respond", END)
+    builder.add_conditional_edges(
+        "resolve_integrations",
+        route_integration_resolution,
+        {"reason": "reason", "respond": "respond"},
+    )
 
-        logger.info("Compiled LangGraph Agent StateGraph.")
-        return builder.compile()
+    def route_reason_output(state: AgentState) -> str:
+        if state.get("active_tool_call"):
+            return "execute_tool"
+        return "respond"
 
-    except ImportError:
-        logger.warning("LangGraph not installed in environment. Using FallbackAgentRunner.")
-        return FallbackAgentRunner()
+    builder.add_conditional_edges(
+        "reason",
+        route_reason_output,
+        {"execute_tool": "execute_tool", "respond": "respond"},
+    )
+    builder.add_edge("execute_tool", "reason")
+    builder.add_edge("respond", END)
+
+    logger.info("Compiled LangGraph Agent StateGraph.")
+    return builder.compile()
 
 
 agent_graph = build_agent_graph()

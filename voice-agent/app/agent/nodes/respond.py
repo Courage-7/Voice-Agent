@@ -5,7 +5,7 @@ from app.agent.state import AgentState
 from app.shared.utils import clean_voice_text
 
 
-async def respond_node(state: AgentState) -> Dict[str, Any]:
+def respond_node(state: AgentState) -> Dict[str, Any]:
     """Clean and prepare text for TTS vocalization."""
     raw_response = state.get("response_text", "")
     cleaned = clean_voice_text(raw_response)

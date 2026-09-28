@@ -21,4 +21,5 @@ async def execute_tool_node(state: AgentState) -> Dict[str, Any]:
         session_id=state.get("session_id", ""),
     )
 
-    return {"tool_result": result}
+    return {"tool_result": result, "active_tool_call": None}
+

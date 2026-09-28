@@ -7,7 +7,7 @@ from app.users.service import user_service
 
 
 async def load_context_node(state: AgentState) -> Dict[str, Any]:
-    """Fetch user profile and relevant memories from Supabase."""
+    """Fetch user profile and relevant memories from database."""
     user_id = state.get("user_id", "default_user")
     user = await user_service.get_or_create_user(user_id)
     memories_summary = await memory_service.get_user_memory_summary(user_id)

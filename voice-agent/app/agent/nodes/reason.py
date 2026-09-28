@@ -17,6 +17,9 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
     for msg in state.get("messages", []):
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
 
+    if state.get("tool_result") is not None:
+        messages.append({"role": "system", "content": f"Tool execution result: {state.get('tool_result')}"})
+
     # Stream or generate response from Groq
     response_tokens = []
     async for token in groq_client.stream_chat_completion(messages=messages):

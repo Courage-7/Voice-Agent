@@ -1,10 +1,10 @@
 """Task decomposition and planning engine for complex multi-step workflows."""
 
 import logging
-from typing import Any, Dict, List
-from uuid import uuid4
+from typing import Any, Dict, List, Optional
 
 from app.agent.complex_tasks.state import TaskStep
+from app.integrations.composio.client import composio_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +12,51 @@ logger = logging.getLogger(__name__)
 class ComplexTaskPlanner:
     """Decomposes high-level composite requests into concrete executable tool steps."""
 
-    def plan_steps(self, goal: str, context: Dict[str, Any]) -> List[TaskStep]:
-        """Generate an ordered plan of sub-steps based on user goal."""
+    async def plan_steps(
+        self,
+        goal: str,
+        context: Optional[Dict[str, Any]] = None,
+        user_id: str = "default_user",
+    ) -> List[TaskStep]:
+        """Generate an ordered plan of sub-steps based on user goal and connected skills."""
+        ctx = context or {}
+
+        # 1. Dynamic skill resolution via Composio Gateway
+        try:
+            skill_steps = await composio_gateway.resolve_skill_steps(
+                goal=goal,
+                entity_id=user_id,
+                context=ctx,
+            )
+            if skill_steps:
+                steps: List[TaskStep] = []
+                for idx, step_dict in enumerate(skill_steps, start=1):
+                    steps.append(
+                        TaskStep(
+                            step_id=idx,
+                            description=step_dict.get("description", f"Step {idx}"),
+                            tool_name=step_dict.get("tool_name", "web_search_serpapi"),
+                            arguments=step_dict.get("arguments", {}),
+                            status="pending",
+                            result=None,
+                        )
+                    )
+                logger.info(f"Planned {len(steps)} steps via Composio skills for goal: '{goal}'")
+                return steps
+        except Exception:
+            logger.exception("Error resolving steps via Composio skills; falling back to heuristic planner.")
+
+        # 2. Fallback heuristic planning
+        steps = self._fallback_heuristic_plan(goal, ctx)
+        logger.info(f"Planned {len(steps)} steps via fallback heuristics for goal: '{goal}'")
+        return steps
+
+    def _fallback_heuristic_plan(self, goal: str, context: Dict[str, Any]) -> List[TaskStep]:
+        """Deterministic rule-based planning fallback when dynamic skills are unavailable."""
         goal_lower = goal.lower()
         steps: List[TaskStep] = []
 
-        # Pattern 1: Search emails + create note / doc
-        if "email" in goal_lower and ("doc" in goal_lower or "note" in goal_lower or "sheet" in goal_lower):
+        if "email" in goal_lower and ("doc" in goal_lower or "note" in goal_lower):
             steps.append(
                 TaskStep(
                     step_id=1,
@@ -34,20 +72,48 @@ class ComplexTaskPlanner:
                     step_id=2,
                     description="Save findings into Google Doc",
                     tool_name="manage_google_doc",
-                    arguments={"title": f"Summary: {goal[:30]}", "content": "Summary of findings..."},
+                    arguments={
+                        "title": context.get("title", f"Summary: {goal[:30]}"),
+                        "content": context.get("content", "Summary of findings..."),
+                    },
                     status="pending",
                     result=None,
                 )
             )
 
-        # Pattern 2: Search web + schedule meeting / follow up
+        elif "email" in goal_lower and ("sheet" in goal_lower or "spreadsheet" in goal_lower or "log" in goal_lower):
+            steps.append(
+                TaskStep(
+                    step_id=1,
+                    description="Search inbox for relevant messages",
+                    tool_name="search_emails",
+                    arguments={"query": context.get("query", "is:unread")},
+                    status="pending",
+                    result=None,
+                )
+            )
+            steps.append(
+                TaskStep(
+                    step_id=2,
+                    description="Log email records into Google Sheet",
+                    tool_name="manage_google_sheet",
+                    arguments={
+                        "spreadsheet_id": context.get("spreadsheet_id", "active_sheet"),
+                        "action": "append",
+                        "values": context.get("values", ["Subject", "Sender", "Date"]),
+                    },
+                    status="pending",
+                    result=None,
+                )
+            )
+
         elif ("search" in goal_lower or "research" in goal_lower) and "meeting" in goal_lower:
             steps.append(
                 TaskStep(
                     step_id=1,
                     description="Perform web research via Perplexity",
-                    tool_name="perplexity_research",
-                    arguments={"query": context.get("query", goal)},
+                    tool_name="perplexity_ai_research",
+                    arguments={"prompt": context.get("query", goal)},
                     status="pending",
                     result=None,
                 )
@@ -57,13 +123,12 @@ class ComplexTaskPlanner:
                     step_id=2,
                     description="List upcoming calendar slots for discussion",
                     tool_name="list_calendar_events",
-                    arguments={"max_events": 5},
+                    arguments={"max_events": context.get("max_events", 5)},
                     status="pending",
                     result=None,
                 )
             )
 
-        # Pattern 3: Email overview + draft response
         elif "email" in goal_lower and ("reply" in goal_lower or "draft" in goal_lower or "send" in goal_lower):
             steps.append(
                 TaskStep(
@@ -90,7 +155,6 @@ class ComplexTaskPlanner:
                 )
             )
 
-        # Generic Multi-Step Fallback
         else:
             steps.append(
                 TaskStep(
@@ -113,7 +177,6 @@ class ComplexTaskPlanner:
                 )
             )
 
-        logger.info(f"Planned {len(steps)} steps for complex task: '{goal}'")
         return steps
 
 

@@ -15,7 +15,7 @@ async def test_user_service_profile():
 
 
 @pytest.mark.asyncio
-async def test_agent_graph_execution():
+async def test_agent_graph_execution(fake_reasoning):
     """Verify LangGraph executes through load_context and reason nodes."""
     initial_state = {
         "session_id": "test_session_1",
