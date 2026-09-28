@@ -1,0 +1,9 @@
+Route: Built-in image generation, reference-based refinement.
+Reference: 02-voice-wave.png
+Output: 05-wave-lettering.png
+
+Use case: logo-brand refinement.
+Input image: edit target, the previously chosen Shinra Voice Wave logo.
+Create ONE refined logo concept, not a comparison sheet. The user likes this design but wants the sound waves incorporated into the LETTERS of Shinra instead of an icon beside the name.
+Remove the separate waveform icon entirely. Build a single beautifully kerned custom typographic wordmark reading exactly "Shinra" (S h i n r a). Transform the adjacent lowercase h and i into an integrated terracotta audio-wave motif: their vertical strokes have rounded capsule ends and varying waveform heights, with the h shoulder retained as a smooth wave arch and the i still clearly recognisable. The wave geometry must form the letter bodies themselves, not appear behind, above, below or beside ordinary lettering. Keep the S and nra in near-black charcoal. Preserve the original's friendly substantial geometric sans character, exact brand spelling, terracotta #b95740 and charcoal #1d1d1b palette. The result must read Shinra effortlessly, not S + a symbol + nra.
+Flat crisp vector-like graphic, no gradients, no shadows, no texture. One large centered horizontal wordmark on fully opaque solid warm ivory #f7f5f0 with generous margins. No standalone icon, no tagline, no labels, no extra lettering.

@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Voice AI Agent System Architecture",
+    "output": "voice_agent_architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1220, 580],
+    "views": [
+      {
+        "id": "realtime-hotpath",
+        "label": "Realtime Voice Loop",
+        "focus": ["client_hud", "ws_gateway", "deepgram_voice", "groq_engine"],
+        "note": "Sub-300ms bidirectional voice loop: Web Audio PCM through FastAPI to Deepgram STT/TTS and Groq LPU."
+      },
+      {
+        "id": "tool-execution-layer",
+        "label": "Tool Defense & OAuth",
+        "focus": ["deepgram_voice", "token_distiller", "tool_ecosystem", "task_planner"],
+        "note": "Hard 1,200 char token budgeting with write confirmation barriers and Composio OAuth actions."
+      },
+      {
+        "id": "persistence-observability",
+        "label": "State, Prompts & Metrics",
+        "focus": ["ws_gateway", "prompt_engine", "telemetry", "supabase_db"],
+        "note": "Conversational human persona styles, Supabase Postgres state hydration, and live Prometheus percentiles."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "client_hud",
+      "type": "frontend",
+      "label": "Three.js Cyber HUD",
+      "sublabel": "React 18 / 16kHz PCM",
+      "brand": "react",
+      "tag": "Web Audio API",
+      "pos": [50, 250],
+      "size": [170, 72]
+    },
+    {
+      "id": "ws_gateway",
+      "type": "backend",
+      "label": "FastAPI Realtime Core",
+      "sublabel": "WebSocket & REST Hub",
+      "brand": "fastapi",
+      "tag": "Full-Duplex ASGI",
+      "pos": [340, 250],
+      "size": [170, 72]
+    },
+    {
+      "id": "prompt_engine",
+      "type": "backend",
+      "label": "Persona & Voice Engine",
+      "sublabel": "5 Human Persona Skills",
+      "tag": "Spoken Cadence",
+      "pos": [340, 70],
+      "size": [170, 64]
+    },
+    {
+      "id": "telemetry",
+      "type": "backend",
+      "label": "Telemetry & Metrics",
+      "sublabel": "Prometheus p50/p95/p99",
+      "tag": "Live Latency",
+      "pos": [340, 430],
+      "size": [170, 64]
+    },
+    {
+      "id": "deepgram_voice",
+      "type": "external",
+      "label": "Deepgram Voice Agent",
+      "sublabel": "Nova-2 STT & Aura-2 TTS",
+      "tag": "Barge-in VAD",
+      "pos": [630, 250],
+      "size": [180, 72]
+    },
+    {
+      "id": "token_distiller",
+      "type": "security",
+      "label": "Speech Token Distiller",
+      "sublabel": "1,200 Char Hard Ceiling",
+      "tag": "Context Protection",
+      "pos": [630, 70],
+      "size": [180, 64]
+    },
+    {
+      "id": "supabase_db",
+      "type": "database",
+      "label": "Supabase PostgreSQL",
+      "sublabel": "Memories, Users, Sessions",
+      "brand": "supabase",
+      "tag": "Durable State",
+      "pos": [630, 430],
+      "size": [180, 64]
+    },
+    {
+      "id": "groq_engine",
+      "type": "external",
+      "label": "Groq LPU Engine",
+      "sublabel": "Llama 3.3 70B Versatile",
+      "tag": "Sub-300ms TTFT",
+      "pos": [930, 250],
+      "size": [180, 72]
+    },
+    {
+      "id": "tool_ecosystem",
+      "type": "security",
+      "label": "Tool Registry & OAuth",
+      "sublabel": "17 Tools / Composio Hub",
+      "tag": "Workspace & Search",
+      "pos": [930, 70],
+      "size": [180, 64]
+    },
+    {
+      "id": "task_planner",
+      "type": "backend",
+      "label": "Complex Task Engine",
+      "sublabel": "Multi-Step Decomposition",
+      "tag": "Plan & Resume",
+      "pos": [930, 430],
+      "size": [180, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Backend Application Runtime",
+      "wraps": ["ws_gateway", "prompt_engine", "telemetry"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Tool Defense & Execution Hub",
+      "wraps": ["token_distiller", "tool_ecosystem"]
+    },
+    {
+      "kind": "region",
+      "label": "Realtime AI Cloud Mesh",
+      "wraps": ["deepgram_voice", "groq_engine"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-client-ws",
+      "from": "client_hud",
+      "to": "ws_gateway",
+      "label": "16kHz PCM audio",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn-ws-deepgram",
+      "from": "ws_gateway",
+      "to": "deepgram_voice",
+      "label": "live audio stream",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn-deepgram-groq",
+      "from": "deepgram_voice",
+      "to": "groq_engine",
+      "label": "sub-second tokens",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn-ws-prompt",
+      "from": "ws_gateway",
+      "to": "prompt_engine",
+      "label": "human voice rules",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "conn-deepgram-distiller",
+      "from": "deepgram_voice",
+      "to": "token_distiller",
+      "label": "tool call dispatch",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDy": -20
+    },
+    {
+      "id": "conn-distiller-tools",
+      "from": "token_distiller",
+      "to": "tool_ecosystem",
+      "label": "budgeted execution",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "conn-ws-telemetry",
+      "from": "ws_gateway",
+      "to": "telemetry",
+      "label": "p50/p95/p99",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 50
+    },
+    {
+      "id": "conn-ws-supabase",
+      "from": "ws_gateway",
+      "to": "supabase_db",
+      "label": "memories & state",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "conn-groq-planner",
+      "from": "groq_engine",
+      "to": "task_planner",
+      "label": "complex task plans",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "conn-planner-db",
+      "from": "task_planner",
+      "to": "supabase_db",
+      "label": "task checkpoints",
+      "fromSide": "left",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Sub-300ms Realtime Voice Loop",
+      "items": [
+        "Three.js Cyber HUD streams full-duplex 16kHz linear16 PCM via Web Audio API with zero-gain feedback suppression",
+        "FastAPI WebSocket gateway bridges audio chunks to Deepgram Nova-2 STT, VAD, and Aura-2 TTS with Groq LPU inference"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Token Budgeting & Write Safety",
+      "items": [
+        "SpeechPayloadDistiller enforces a strict 1,200 character ceiling (~300 tokens) on all tool outputs to protect Groq context",
+        "Tool registry enforces confirmation barriers on write operations and connects securely to Workspace via Composio OAuth"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "State Persistence & Telemetry",
+      "items": [
+        "Supabase PostgreSQL stores relational users, multi-turn transcripts, and vector memories with automatic cache hydration",
+        "Prometheus metrics collector records live p50, p95, and p99 latency percentiles alongside session turn metrics"
+      ]
+    }
+  ]
+}

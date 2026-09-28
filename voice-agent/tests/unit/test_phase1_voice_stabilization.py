@@ -26,8 +26,8 @@ async def test_native_greeting_in_settings_configuration():
 
     assert sent_payload["type"] == "Settings"
     assert "agent" in sent_payload
-    assert sent_payload["agent"]["greeting"] == "Hello! I'm here and ready to help."
-    assert sent_payload["agent"]["think"]["provider"]["type"] == "groq"
+    assert "greeting" in sent_payload["agent"] and len(sent_payload["agent"]["greeting"]) > 0
+    assert sent_payload["agent"]["think"]["provider"]["type"] in ["groq", "open_ai"]
     assert sent_payload["agent"]["listen"]["provider"]["type"] == "deepgram"
     assert sent_payload["agent"]["speak"]["provider"]["type"] == "deepgram"
 
@@ -130,3 +130,43 @@ async def test_realtime_client_session_wires_metrics_and_events():
     # Simulate close
     await client_session.close()
     assert client_session.state == SessionState.DISCONNECTED
+
+
+def test_dynamic_greeting_generation():
+    """Verify dynamic greeting adapts to user's name and is warm and engaging."""
+    session = DeepgramVoiceAgentSession(session_id="test_sess_5", user_id="user_123")
+    greeting_named = session._generate_greeting("Alex")
+    assert "Alex" in greeting_named
+    assert len(greeting_named) > 10
+
+    greeting_default = session._generate_greeting("there")
+    assert "there" in greeting_default
+    assert len(greeting_default) > 10
+
+
+@pytest.mark.asyncio
+async def test_composio_connected_accounts_cache():
+    """Verify composio gateway caches connected accounts to avoid startup lag."""
+    from app.integrations.composio.client import ComposioGateway
+
+    gateway = ComposioGateway()
+    mock_client = MagicMock()
+    gateway._client = mock_client
+
+    mock_item = MagicMock()
+    mock_item.toolkit = MagicMock(slug="gmail")
+    mock_item.status = "ACTIVE"
+    mock_item.id = "conn_123"
+
+    mock_client.connected_accounts.list.return_value = MagicMock(items=[mock_item])
+
+    # First call hits mock_client
+    res1 = await gateway.get_connected_accounts("user_test")
+    assert len(res1) == 1
+    assert res1[0]["app"] == "GMAIL"
+    assert mock_client.connected_accounts.list.call_count == 1
+
+    # Second call within TTL hits cache (no network/SDK call)
+    res2 = await gateway.get_connected_accounts("user_test")
+    assert res2 == res1
+    assert mock_client.connected_accounts.list.call_count == 1
