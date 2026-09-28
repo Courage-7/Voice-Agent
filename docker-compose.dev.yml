@@ -1,0 +1,9 @@
+# Explicit opt-in: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  voice-agent:
+    environment:
+      ENVIRONMENT: development
+      PYTHONPATH: /app/voice-agent
+    volumes:
+      - ./voice-agent/app:/app/voice-agent/app:ro
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/voice-agent/app" ]

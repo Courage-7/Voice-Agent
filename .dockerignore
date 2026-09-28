@@ -1,0 +1,46 @@
+# Git and IDE metadata
+.git
+.github
+.vscode
+.gemini
+
+# Secrets and environment files
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+
+# Python virtual environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/build/
+**/dist/
+
+# Node.js dependencies and build output
+node_modules/
+frontend/node_modules/
+**/node_modules/
+
+# Local documents and scratch
+docs/
+scratch/
+.codex/
+.agents/
+**/graphify-out/

@@ -1,7 +1,7 @@
 [project]
 name = "voice-agent"
 version = "0.1.0"
-description = "Voice AI Agent with Deepgram, Groq, LangGraph, Composio, and Supabase"
+description = "Voice AI Agent with Deepgram, Groq, LangGraph, Composio, and Neon PostgreSQL"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,11 +15,12 @@ dependencies = [
     "langchain-core>=0.3.0",
     "langchain-groq>=0.2.0",
     "langgraph>=0.2.0",
-    "composio-core>=0.6.0",
-    "composio-langchain>=0.6.0",
-    "supabase>=2.7.0",
+    "composio==0.20.0",
+    "composio-langchain==0.20.0",
+    "asyncpg>=0.29.0",
     "httpx>=0.27.0",
     "python-dotenv>=1.0.1",
+    "PyJWT>=2.10,<3",
 ]
 
 [project.optional-dependencies]
@@ -29,5 +30,24 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools==80.9.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["voice-agent"]
+include = ["app*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"app.realtime" = ["playground.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["voice-agent/tests"]
+pythonpath = ["voice-agent"]
+addopts = "--import-mode=importlib --strict-markers -ra"
+required_plugins = ["pytest-asyncio>=0.24"]
+markers = [
+    "asyncio: mark test as asyncio coroutine",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

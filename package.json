@@ -1,0 +1,10 @@
+{
+  "name": "voice-agent-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shinra",
+  "scripts": {
+    "architecture": "node -e \"const { exec } = require('child_process'); const p = process.platform === 'win32' ? 'start \\\"\\\" \\\"docs/architecture/voice_agent_architecture.html\\\"' : process.platform === 'darwin' ? 'open docs/architecture/voice_agent_architecture.html' : 'xdg-open docs/architecture/voice_agent_architecture.html'; exec(p);\"",
+    "arch": "npm run architecture"
+  }
+}
