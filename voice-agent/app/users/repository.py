@@ -1,8 +1,7 @@
-"""User repository with Supabase and in-memory caching."""
+"""User repository with Neon PostgreSQL and in-memory caching."""
 
-import asyncio
 from typing import Dict, Optional
-from app.integrations.supabase.client import supabase_gateway
+from app.db.session import db_gateway
 from app.users.models import UserProfile
 
 
@@ -19,14 +18,11 @@ class UserRepository:
         if user_id in self._cache:
             return self._cache[user_id]
 
-        if supabase_gateway.is_connected:
+        if db_gateway.is_connected:
             try:
-                res = await asyncio.to_thread(
-                    lambda: supabase_gateway.client.table("users")
-                    .select("*").eq("id", user_id).execute()
-                )
-                if res.data:
-                    user = UserProfile(**res.data[0])
+                row = await db_gateway.fetchrow_as_user(user_id, "SELECT * FROM users WHERE id = $1", user_id)
+                if row:
+                    user = UserProfile(**dict(row))
                     self._cache[user_id] = user
                     return user
             except Exception:
@@ -36,15 +32,32 @@ class UserRepository:
 
     async def save(self, user: UserProfile) -> UserProfile:
         """Save or update user profile."""
-        self._cache[user.id] = user
-        if supabase_gateway.is_connected:
+        if db_gateway.is_connected:
             try:
-                await asyncio.to_thread(
-                    lambda: supabase_gateway.client.table("users")
-                    .upsert(user.model_dump()).execute()
+                query = """
+                INSERT INTO users (id, full_name, timezone, preferred_persona, email, metadata, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, now())
+                ON CONFLICT (id) DO UPDATE SET
+                    full_name = EXCLUDED.full_name,
+                    timezone = EXCLUDED.timezone,
+                    preferred_persona = EXCLUDED.preferred_persona,
+                    email = EXCLUDED.email,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = now()
+                """
+                await db_gateway.execute_as_user(
+                    user.id,
+                    query,
+                    user.id,
+                    user.full_name,
+                    user.timezone,
+                    user.preferred_persona,
+                    user.email,
+                    user.metadata,
                 )
             except Exception:
                 pass
+        self._cache[user.id] = user
         return user
 
 
