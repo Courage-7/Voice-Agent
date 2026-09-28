@@ -3,12 +3,12 @@
 from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from app.core.config import settings
 
 router = APIRouter()
 
 PLAYGROUND_HTML_PATH = Path(__file__).parent / "playground.html"
-FRONTEND_DIST_PATH = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+FRONTEND_DIST_PATH = settings.frontend_dist_path
 FRONTEND_INDEX_PATH = FRONTEND_DIST_PATH / "index.html"
 
 
@@ -27,4 +27,4 @@ async def main_frontend():
         return HTMLResponse(content=FRONTEND_INDEX_PATH.read_text(encoding="utf-8"))
     if PLAYGROUND_HTML_PATH.exists():
         return HTMLResponse(content=PLAYGROUND_HTML_PATH.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>AETHERIS Voice AI Matrix</h1><p>Frontend assets not found.</p>")
+    return HTMLResponse(content="<h1>SHINRA Voice AI Matrix</h1><p>Frontend assets not found.</p>")

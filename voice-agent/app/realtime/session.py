@@ -1,20 +1,20 @@
-"""Realtime Client Session orchestrator connecting Client WebSocket with Deepgram Gateway."""
-
 import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional
 
 from fastapi import WebSocket
+from app.core.config import settings
 from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
 from app.observability.metrics import metrics_collector
+from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 from app.realtime.state import SessionState
 
 logger = logging.getLogger(__name__)
 
 
 class RealtimeClientSession:
-    """Coordinates full-duplex streaming between the Client WebSocket and Deepgram Agent."""
+    """Coordinates full-duplex streaming between the Client WebSocket and Voice Engine."""
 
     def __init__(
         self,
@@ -29,18 +29,29 @@ class RealtimeClientSession:
         self.voice_model = voice_model
         self.state = SessionState.CONNECTING
 
-        # Backend Deepgram Session
-        self.deepgram_session = DeepgramVoiceAgentSession(
-            session_id=session_id,
-            user_id=user_id,
-            voice_model=voice_model,
-            on_audio_chunk=self._forward_audio_to_client,
-            on_event=self._forward_event_to_client,
-        )
+        # Select pipeline mode: decoupled dual-stream or monolithic deepgram_agent
+        if getattr(settings, "voice_pipeline_mode", "decoupled") == "decoupled":
+            self.backend_engine = DualStreamVoiceOrchestrator(
+                session_id=session_id,
+                user_id=user_id,
+                voice_model=voice_model,
+                on_audio_chunk=self._forward_audio_to_client,
+                on_event=self._forward_event_to_client,
+            )
+        else:
+            self.backend_engine = DeepgramVoiceAgentSession(
+                session_id=session_id,
+                user_id=user_id,
+                voice_model=voice_model,
+                on_audio_chunk=self._forward_audio_to_client,
+                on_event=self._forward_event_to_client,
+            )
+        # Backward compatibility alias
+        self.deepgram_session = self.backend_engine
 
-    async def start(self) -> None:
+    async def start(self, subprotocol: Optional[str] = None) -> None:
         """Start the session and connect to Deepgram."""
-        await self.client_ws.accept()
+        await self.client_ws.accept(subprotocol=subprotocol)
         self.state = SessionState.CONNECTED
         metrics_collector.increment_session()
         await self._send_state_update()
@@ -109,8 +120,14 @@ class RealtimeClientSession:
             self.state = SessionState.LISTENING
             metrics_collector.record_turn()
         elif event_type == "FunctionCallRequest":
-            tool_name = event.get("function_name") or event.get("name") or "unknown_tool"
-            metrics_collector.record_tool_call(tool_name)
+            functions = event.get("functions", [])
+            if functions:
+                for fn in functions:
+                    tool_name = fn.get("name") or fn.get("function_name") or "unknown_tool"
+                    metrics_collector.record_tool_call(tool_name)
+            else:
+                tool_name = event.get("function_name") or event.get("name") or "unknown_tool"
+                metrics_collector.record_tool_call(tool_name)
 
         await self._send_json_message(event)
 
@@ -129,4 +146,14 @@ class RealtimeClientSession:
             metrics_collector.decrement_session()
         self.state = SessionState.DISCONNECTED
         await self.deepgram_session.close()
+
+        # Consistently close client WebSocket leg (Phase 5 / F07)
+        if hasattr(self.client_ws, "close"):
+            try:
+                res = self.client_ws.close()
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as e:
+                logger.debug(f"[{self.session_id}] Error closing client_ws: {e}")
+
         logger.info(f"[{self.session_id}] Realtime Client Session ended.")

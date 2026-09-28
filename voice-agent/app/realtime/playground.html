@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AETHERIS · Quantum Neural Voice Interface</title>
+    <title>SHINRA · Quantum Neural Voice Interface</title>
     
     <!-- Cyber Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -833,7 +833,7 @@
                     </svg>
                 </div>
                 <div class="brand-text-block">
-                    <span class="brand-title">AETHERIS · AI</span>
+                    <span class="brand-title">SHINRA · AI</span>
                     <span class="brand-subtitle">Quantum Neural Voice Matrix</span>
                 </div>
             </div>
@@ -895,7 +895,7 @@
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                         </svg>
-                        <span id="currentSpeakerLabel">AETHERIS NEURAL VOICE</span>
+                        <span id="currentSpeakerLabel">SHINRA NEURAL VOICE</span>
                     </div>
 
                     <div class="audio-meter-strip" id="audioMeterStrip">
@@ -1030,16 +1030,14 @@
                     <span class="transcript-role-agent">SYSTEM</span>
                     <span>SESSION INIT</span>
                 </div>
-                <div class="transcript-body">AETHERIS Quantum Voice Node online and standby.</div>
+                <div class="transcript-body">SHINRA Quantum Voice Node online and standby.</div>
             </div>
         </div>
     </aside>
 
     <!-- Master Application Code -->
     <script>
-        // ==============================================================
-        // 1. THREE.JS 3D NEURAL CORE & PROCEDURAL ENERGY PARTICLES
-        // ==============================================================
+        // 1. Three.js 3D Neural Core & Procedural Energy Particles
         let scene, camera, renderer;
         let coreSphere, outerWireframe, orbitalGimbalRings = [], particleSwarm;
         let clock = new THREE.Clock();
@@ -1241,9 +1239,7 @@
             coreSpeed = theme.speed;
         }
 
-        // ==============================================================
-        // 2. QUANTUM CONNECTORS MATRIX (REAL COMPOSIO REST API)
-        // ==============================================================
+        // 2. Quantum Connectors Matrix (Real Composio REST API)
         const APP_VECTORS = {
             GMAIL: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`,
             OUTLOOK: `<svg width="18" height="18" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0078D4"/><path fill="#FFF" d="M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm7-4.5V17a2 2 0 0 1-2 2H7l-4-3V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2.5z"/></svg>`,
@@ -1253,6 +1249,7 @@
             GOOGLEDRIVE: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFC107" d="M8.5 3l4.5 7.8H4L1.7 6.4 8.5 3z"/><path fill="#2196F3" d="M22.3 15.6l-2.3 4H7l4.5-7.8h10.8z"/><path fill="#4CAF50" d="M13 10.8L8.5 3 4 10.8l4.5 7.8 4.5-7.8z"/></svg>`,
             SERPAPI: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h5.9c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7c2.2-2 3.2-5 3.2-8.4z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.8c-1.1.7-2.5 1.2-4.3 1.2-3.3 0-6.1-2.2-7.1-5.3H1.1v2.9C3.1 20 7.2 23 12 23z"/><path fill="#FBBC05" d="M4.9 13.1c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3V5.6H1.1C.4 7 0 8.6 0 10.8s.4 3.8 1.1 5.2l3.8-2.9z"/><path fill="#EA4335" d="M12 4.4c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1 15.2 0 12 0 7.2 0 3.1 3 1.1 7l3.8 2.9c1-3.1 3.8-5.5 7.1-5.5z"/></svg>`,
             PERPLEXITYAI: `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#22D3EE" d="M12 2L9 7h6l-3-5zm0 20l3-5H9l3 5zm8-10l-5-3v6l5-3zM4 12l5 3V9L4 12z"/><circle cx="12" cy="12" r="3" fill="#06B6D4"/></svg>`,
+            TAVILY: `<svg width="18" height="18" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0C1E36"/><path d="M6 7.5h12M12 7.5v10M12 12l4.5 4.5M12 12l-4.5 4.5" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7.5" r="2" fill="#38BDF8"/><circle cx="16.5" cy="16.5" r="1.5" fill="#0EA5E9"/><circle cx="7.5" cy="16.5" r="1.5" fill="#0EA5E9"/></svg>`,
         };
 
         const connectorsDrawer = document.getElementById('connectorsDrawer');
@@ -1361,9 +1358,7 @@
             }
         };
 
-        // ==============================================================
-        // 3. WEBSOCKET & DUPLEX AUDIO PIPELINE
-        // ==============================================================
+        // 3. WebSocket & Duplex Audio Pipeline
         let ws = null;
         let audioContext = null;
         let micStream = null;
@@ -1400,12 +1395,12 @@
                 currentSpeakerLabel.textContent = 'OPERATOR (USER)';
                 dialogueTextStream.className = 'dialogue-text-stream user-speaking';
             } else if (formatted === 'SPEAKING') {
-                currentSpeakerLabel.textContent = 'AETHERIS (AGENT)';
+                currentSpeakerLabel.textContent = 'SHINRA (AGENT)';
                 dialogueTextStream.className = 'dialogue-text-stream assistant-speaking';
             } else if (formatted === 'THINKING') {
                 currentSpeakerLabel.textContent = 'NEURAL PROCESSING...';
             } else {
-                currentSpeakerLabel.textContent = 'AETHERIS NEURAL VOICE';
+                currentSpeakerLabel.textContent = 'SHINRA NEURAL VOICE';
                 dialogueTextStream.className = 'dialogue-text-stream';
             }
         }
@@ -1416,7 +1411,7 @@
             const timeStr = new Date().toLocaleTimeString();
             entry.innerHTML = `
                 <div class="transcript-meta">
-                    <span class="${role === 'user' ? 'transcript-role-user' : 'transcript-role-agent'}">${role === 'user' ? 'OPERATOR' : 'AETHERIS'}</span>
+                    <span class="${role === 'user' ? 'transcript-role-user' : 'transcript-role-agent'}">${role === 'user' ? 'OPERATOR' : 'SHINRA'}</span>
                     <span>${timeStr}</span>
                 </div>
                 <div class="transcript-body">${text}</div>
@@ -1439,6 +1434,8 @@
             else if (name === 'list_calendar_events') brief = 'FETCHING CALENDAR MEETINGS';
             else if (name === 'create_calendar_event') brief = `SCHEDULING "${params.title || 'Meeting'}"`;
             else if (name === 'web_search_serpapi') brief = `RUNNING GOOGLE SEARCH: "${params.query || ''}"`;
+            else if (name === 'tavily_search') brief = `RUNNING TAVILY SEARCH: "${params.query || ''}"`;
+            else if (name === 'perplexity_ai_research') brief = `RUNNING PERPLEXITY AI: "${params.prompt || ''}"`;
 
             toolExecutionText.textContent = brief;
         }
@@ -1589,8 +1586,11 @@
 
             const src = audioContext.createMediaStreamSource(micStream);
             processor = audioContext.createScriptProcessor(1024, 1, 1);
+            const muteGain = audioContext.createGain();
+            muteGain.gain.value = 0;
             src.connect(processor);
-            processor.connect(audioContext.destination);
+            processor.connect(muteGain);
+            muteGain.connect(audioContext.destination);
 
             processor.onaudioprocess = (e) => {
                 if (!isSessionActive || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -1658,9 +1658,7 @@
             };
         }
 
-        // ==============================================================
-        // 4. BOOTSTRAP INIT
-        // ==============================================================
+        // 4. Bootstrap Initialization
         window.addEventListener('DOMContentLoaded', () => {
             init3D();
             void fetchAndRenderConnectors();
