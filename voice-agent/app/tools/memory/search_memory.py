@@ -10,6 +10,7 @@ class SearchMemoryTool(BaseTool):
     """Tool to search past memories, notes, and user preferences."""
 
     name = "search_user_memory"
+    capability: str = "memory"
     description = "Search long-term memory for user preferences, notes, past discussions, and facts."
     parameters = {
         "type": "object",

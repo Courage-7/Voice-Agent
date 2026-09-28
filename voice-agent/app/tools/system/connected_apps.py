@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict
 from app.integrations.composio.client import composio_gateway
 from app.tools.base import BaseTool
+from app.tools.capability import is_account_active
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,10 @@ class GetConnectedAppsTool(BaseTool):
     async def execute(self, **kwargs: Any) -> Dict[str, Any]:
         user_id = kwargs.get("user_id", "default_user")
         accounts = await composio_gateway.get_connected_accounts(entity_id=user_id)
-        active_apps = [acc["app"] for acc in accounts if acc.get("status") == "ACTIVE"]
+        active_apps = [
+            acc["app"] for acc in accounts
+            if is_account_active(acc.get("status", "")) and acc.get("is_active", True)
+        ]
 
         if active_apps:
             apps_readable = ", ".join(active_apps)

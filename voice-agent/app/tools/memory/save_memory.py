@@ -10,6 +10,7 @@ class SaveMemoryTool(BaseTool):
     """Tool to save personal user facts, preferences, and recurring context."""
 
     name = "save_user_memory"
+    capability: str = "memory"
     description = "Save an important fact, preference, relationship, or instruction into long-term memory."
     parameters = {
         "type": "object",

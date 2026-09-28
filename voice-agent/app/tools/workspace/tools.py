@@ -5,15 +5,40 @@ from app.integrations.composio.client import composio_gateway
 from app.tools.base import BaseTool
 
 
+def _format_drive_files(raw_data: Any, max_results: int = 5) -> List[Dict[str, str]]:
+    """Format Google Drive search items into compact file records."""
+    raw_files: List[Any] = []
+    if isinstance(raw_data, dict):
+        inner = raw_data.get("data") or raw_data.get("files") or raw_data
+        if isinstance(inner, dict):
+            raw_files = inner.get("files") or []
+        elif isinstance(inner, list):
+            raw_files = inner
+    elif isinstance(raw_data, list):
+        raw_files = raw_data
+
+    clean: List[Dict[str, str]] = []
+    for f in raw_files[:max_results]:
+        if isinstance(f, dict):
+            clean.append({
+                "id": str(f.get("id") or "")[:40],
+                "name": str(f.get("name") or f.get("title") or "Untitled")[:60],
+                "mime_type": str(f.get("mimeType") or "")[:40],
+            })
+    return clean
+
+
 class GoogleSheetsTool(BaseTool):
     """Tool to read from and append rows to Google Sheets."""
 
     name = "manage_google_sheet"
     description = "Read data from or append new rows to a Google Spreadsheet."
     capability = "workspace"
+    supported_connected_apps = ("GOOGLESHEETS",)
     read_only = False
-    requires_confirmation = False
+    requires_confirmation = True
     timeout_seconds = 12.0
+
 
     parameters = {
         "type": "object",
@@ -53,10 +78,15 @@ class GoogleSheetsTool(BaseTool):
                 "error": res.get("error", "Google Sheet operation failed"),
                 "spoken_summary": f"I was unable to {action} data on that Google Sheet.",
             }
+        inner_data = res.get("data", {}) if isinstance(res.get("data"), dict) else {}
+        summary_msg = inner_data.get("message") or inner_data.get("updatedRange") or "Updated successfully"
         return {
             "success": True,
             "spoken_summary": f"Google Sheet {action} operation completed.",
-            "data": res,
+            "spreadsheet_id": spreadsheet_id,
+            "sheet_name": sheet_name,
+            "action": action,
+            "summary": str(summary_msg)[:120],
         }
 
 
@@ -66,9 +96,11 @@ class GoogleDocsTool(BaseTool):
     name = "manage_google_doc"
     description = "Create a new Google Doc or append text to an existing document."
     capability = "workspace"
+    supported_connected_apps = ("GOOGLEDOCS",)
     read_only = False
-    requires_confirmation = False
+    requires_confirmation = True
     timeout_seconds = 12.0
+
 
     parameters = {
         "type": "object",
@@ -98,10 +130,14 @@ class GoogleDocsTool(BaseTool):
                 "error": res.get("error", "Google Doc operation failed"),
                 "spoken_summary": "I was unable to update that Google Doc.",
             }
+        inner_data = res.get("data", {}) if isinstance(res.get("data"), dict) else {}
+        doc_id = inner_data.get("documentId") or document_id or "created"
         return {
             "success": True,
             "spoken_summary": "Google Doc updated successfully.",
-            "data": res,
+            "title": title or "New Note",
+            "document_id": str(doc_id)[:40],
+            "status": "created" if not document_id else "appended",
         }
 
 
@@ -111,6 +147,7 @@ class GoogleDriveTool(BaseTool):
     name = "search_google_drive"
     description = "Search for files, spreadsheets, and documents stored on Google Drive."
     capability = "workspace"
+    supported_connected_apps = ("GOOGLEDRIVE",)
     read_only = True
     requires_confirmation = False
     timeout_seconds = 10.0
@@ -133,8 +170,9 @@ class GoogleDriveTool(BaseTool):
                 "error": res.get("error", "Google Drive search failed"),
                 "spoken_summary": f"Unable to search Google Drive for '{query}'.",
             }
+        files_list = _format_drive_files(res.get("data") or res, max_results=max_results)
         return {
             "success": True,
-            "spoken_summary": f"Found matching files on Google Drive for '{query}'.",
-            "files": res,
+            "spoken_summary": f"Found {len(files_list)} matching files on Google Drive for '{query}'.",
+            "files": files_list,
         }

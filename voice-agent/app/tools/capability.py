@@ -13,6 +13,29 @@ from app.integrations.composio.client import composio_gateway
 logger = logging.getLogger(__name__)
 
 
+def canonical_app_slug(app: str) -> str:
+    """Normalize the toolkit spellings returned by Composio into stable IDs."""
+    normalized = (app or "").upper().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "GOOGLE_CALENDAR": "GOOGLECALENDAR",
+        "GOOGLE_CAL": "GOOGLECALENDAR",
+        "MICROSOFT_OUTLOOK": "OUTLOOK",
+        "OFFICE_365": "OUTLOOK",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def is_account_active(status: str) -> bool:
+    """Canonical check for whether a Composio connected account is usable.
+
+    The Composio SDK returns different status strings depending on provider and
+    SDK version: "ACTIVE", "CONNECTED", or sometimes empty (default active).
+    This single function is the source of truth used everywhere.
+    """
+    normalized = (status or "").upper().strip()
+    return normalized in ("ACTIVE", "CONNECTED", "")
+
+
 class CapabilityResolver:
     """Resolves provider toolkits for user capabilities dynamically."""
 
@@ -21,9 +44,8 @@ class CapabilityResolver:
         accounts = await composio_gateway.get_connected_accounts(entity_id=user_id)
         connected = []
         for acc in accounts:
-            status = acc.get("status", "").upper()
-            if status in ("ACTIVE", "CONNECTED", "INITIATED", ""):
-                app_slug = acc.get("app", "").upper()
+            if is_account_active(acc.get("status", "")) and acc.get("is_active", True):
+                app_slug = canonical_app_slug(acc.get("app", ""))
                 if app_slug:
                     connected.append(app_slug)
         return connected
@@ -39,16 +61,20 @@ class CapabilityResolver:
             (resolved_provider, error_or_disambiguation_dict)
         """
         connected_apps = await self.get_user_connected_apps(user_id)
-        has_gmail = "GMAIL" in connected_apps or "GOOGLE" in connected_apps
-        has_outlook = "OUTLOOK" in connected_apps or "MICROSOFT" in connected_apps
+        has_gmail = "GMAIL" in connected_apps
+        has_outlook = "OUTLOOK" in connected_apps
 
         # 1. User explicitly requested a provider
         if requested_provider:
             req = requested_provider.lower().strip()
             if req in ("gmail", "google"):
-                return "gmail", None
+                if has_gmail:
+                    return "gmail", None
+                return None, self._unavailable("Gmail", "email")
             elif req in ("outlook", "microsoft", "office365"):
-                return "outlook", None
+                if has_outlook:
+                    return "outlook", None
+                return None, self._unavailable("Outlook", "email")
 
         # 2. Only Gmail connected
         if has_gmail and not has_outlook:
@@ -68,8 +94,8 @@ class CapabilityResolver:
                 "spoken_summary": "You have both Gmail and Outlook connected. Which email account would you like me to use?",
             }
 
-        # 5. Neither connected -> Fallback default with clear error summary
-        return "gmail", None
+        # 5. Connection status is a precondition, never a provider default.
+        return None, self._unavailable("an email account", "email")
 
     async def resolve_calendar_provider(
         self,
@@ -82,16 +108,20 @@ class CapabilityResolver:
             (resolved_provider, error_or_disambiguation_dict)
         """
         connected_apps = await self.get_user_connected_apps(user_id)
-        has_google = "GOOGLECALENDAR" in connected_apps or "GOOGLE" in connected_apps or "GMAIL" in connected_apps
-        has_outlook = "OUTLOOK" in connected_apps or "MICROSOFT" in connected_apps
+        has_google = "GOOGLECALENDAR" in connected_apps
+        has_outlook = "OUTLOOK" in connected_apps
 
         # 1. User explicitly requested a provider
         if requested_provider:
             req = requested_provider.lower().strip()
             if req in ("google", "googlecalendar", "gmail"):
-                return "google", None
+                if has_google:
+                    return "google", None
+                return None, self._unavailable("Google Calendar", "calendar")
             elif req in ("outlook", "microsoft", "office365"):
-                return "outlook", None
+                if has_outlook:
+                    return "outlook", None
+                return None, self._unavailable("Outlook", "calendar")
 
         # 2. Only Google Calendar connected
         if has_google and not has_outlook:
@@ -111,8 +141,18 @@ class CapabilityResolver:
                 "spoken_summary": "You have both Google Calendar and Outlook connected. Which calendar would you like me to use?",
             }
 
-        # 5. Neither connected -> Fallback default
-        return "google", None
+        # 5. Connection status is a precondition, never a provider default.
+        return None, self._unavailable("a calendar", "calendar")
+
+    @staticmethod
+    def _unavailable(provider: str, capability: str) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "status": "connection_unavailable",
+            "capability": capability,
+            "error": f"{provider} is not connected for this user.",
+            "spoken_summary": f"I can't access {provider} because it isn't connected to your account.",
+        }
 
 
 capability_resolver = CapabilityResolver()

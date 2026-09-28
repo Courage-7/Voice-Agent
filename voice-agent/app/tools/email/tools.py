@@ -52,6 +52,9 @@ class SendEmailTool(BaseTool):
     read_only = False
     requires_confirmation = True
     timeout_seconds = 15.0
+    operations = ("send_message",)
+    supported_connected_apps = ("GMAIL", "OUTLOOK")
+    supports_parallel_execution = False
 
     parameters = {
         "type": "object",
@@ -63,6 +66,10 @@ class SendEmailTool(BaseTool):
                 "type": "string",
                 "enum": ["gmail", "outlook"],
                 "description": "Optional email provider to use. If omitted, automatically resolves based on connected accounts.",
+            },
+            "confirmed": {
+                "type": "boolean",
+                "description": "Set to true ONLY if the user has explicitly confirmed sending this email.",
             },
         },
         "required": ["recipient", "subject", "body"],
@@ -107,11 +114,13 @@ class SearchEmailsTool(BaseTool):
     """Tool to search recent emails across Gmail or Outlook."""
 
     name = "search_emails"
-    description = "Search through recent emails by query, sender, or subject."
+    description = "Search Gmail or Outlook messages for the authenticated user. Use this only after that provider is connected; it retrieves messages, not just connection status."
     capability = "email"
     read_only = True
     requires_confirmation = False
     timeout_seconds = 10.0
+    operations = ("retrieve_recent_items", "search_messages")
+    supported_connected_apps = ("GMAIL", "OUTLOOK")
 
     parameters = {
         "type": "object",

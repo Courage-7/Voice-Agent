@@ -57,6 +57,9 @@ class CreateCalendarEventTool(BaseTool):
     read_only = False
     requires_confirmation = True
     timeout_seconds = 15.0
+    operations = ("create_event",)
+    supported_connected_apps = ("GOOGLECALENDAR", "OUTLOOK")
+    supports_parallel_execution = False
 
     parameters = {
         "type": "object",
@@ -70,6 +73,10 @@ class CreateCalendarEventTool(BaseTool):
                 "description": "Optional list of attendee email addresses.",
             },
             "provider": {"type": "string", "enum": ["google", "outlook"], "description": "Optional calendar provider. If omitted, resolves automatically based on connected accounts."},
+            "confirmed": {
+                "type": "boolean",
+                "description": "Set to true ONLY if the user has explicitly confirmed scheduling this meeting.",
+            },
         },
         "required": ["title", "start_time"],
     }
@@ -119,11 +126,13 @@ class ListCalendarEventsTool(BaseTool):
     """Tool to list upcoming events and check calendar availability."""
 
     name = "list_calendar_events"
-    description = "List upcoming meetings and check calendar availability for a given time window."
+    description = "Retrieve upcoming meetings from the authenticated user's connected Google Calendar or Outlook calendar. Use this only after that calendar is connected; it retrieves events, not just connection status."
     capability = "calendar"
     read_only = True
     requires_confirmation = False
     timeout_seconds = 10.0
+    operations = ("retrieve_upcoming_items", "search_events")
+    supported_connected_apps = ("GOOGLECALENDAR", "OUTLOOK")
 
     parameters = {
         "type": "object",

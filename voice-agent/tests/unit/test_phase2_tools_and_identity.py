@@ -153,9 +153,21 @@ async def test_search_emails_preserves_identifiers():
         },
     }
 
-    with patch("app.integrations.composio.client.composio_gateway.execute_action", return_value=mock_response):
-        res = await tool.execute(query="Q3 Planning", user_id="user_test")
+    with (
+        patch(
+            "app.tools.email.tools.capability_resolver.resolve_email_provider",
+            new_callable=AsyncMock,
+            return_value=("gmail", None),
+        ),
+        patch(
+            "app.tools.email.tools.composio_gateway.execute_action",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ),
+    ):
+        res = await tool.execute(query="Q3 Planning", user_id="user_test", provider="gmail")
         assert res["success"] is True
+
         assert len(res["emails"]) == 1
         email_item = res["emails"][0]
         assert email_item["message_id"] == "msg_9988"

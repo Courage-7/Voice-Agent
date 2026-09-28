@@ -12,7 +12,7 @@ class RunComplexTaskTool(BaseTool):
         "Execute a multi-step composite workflow across tools and connected apps (e.g. "
         "searching emails and compiling findings into a document, or cross-referencing research and scheduling)."
     )
-    capability: str = "system"
+    capability: str = "workspace"
     read_only: bool = False
     requires_confirmation: bool = False
 

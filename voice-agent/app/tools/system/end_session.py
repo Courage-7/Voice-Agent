@@ -11,7 +11,7 @@ class EndVoiceSessionTool(BaseTool):
     """Tool to gracefully terminate an active voice session."""
 
     name = "end_voice_session"
-    description = "End the current voice conversation session when the user says goodbye, asks to stop, exit, leave, disconnect, or end the call."
+    description = "End the current voice conversation session ONLY when the user explicitly and verbatim commands goodbye, hang up, disconnect, or end the call. NEVER call this tool on 'stop', 'wait', 'hold on', 'thanks', 'okay', or when the user pauses."
     capability = "system"
     read_only = True
     requires_confirmation = False
