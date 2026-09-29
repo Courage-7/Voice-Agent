@@ -30,13 +30,7 @@ function preprocessMathDelimiters(text: string): string {
     .replace(/\\\\([*_`#>\[\]()])/g, '$1')
     .replace(/\\\\\\\\([A-Za-z])/g, '\\\\$1');
 
-  // 3. Normalize accidental headings in chat turns so bubbles retain uniform body typography
-  processed = processed.replace(/^#{1,6}\s+/gm, '');
-
-  // 4. Strip asterisks (*, **) to eliminate vocal 'star star' and visual clutter
-  processed = processed.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1').replace(/\*{1,3}/g, '');
-
-  // 5. Normalize inline smashed list items (e.g. "theory. - Masashi Sugiyama" or "Japan: - Shunichi")
+  // 3. Normalize inline smashed list items (e.g. "theory. - Masashi Sugiyama" or "Japan: - Shunichi")
   // into structured Markdown bullet lines
   processed = processed.replace(/([.:;])\s*-\s+([A-Za-z0-9])/g, '$1\n\n- $2');
 

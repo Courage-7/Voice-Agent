@@ -26,25 +26,46 @@
   margin-bottom: 0;
 }
 
-.message-content h1,
-.message-content h2,
-.message-content h3 {
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0.6rem 0 0.3rem;
+.message-content h1 {
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 1rem 0 0.45rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.message-content h2 {
+  font-size: 14.5px;
+  line-height: 1.45;
+  margin: 0.85rem 0 0.35rem;
   font-weight: 600;
-  color: var(--color-ink);
-  letter-spacing: normal;
+  color: #f1f5f9;
+  letter-spacing: -0.005em;
+}
+
+.message-content h3 {
+  font-size: 13.5px;
+  line-height: 1.45;
+  margin: 0.75rem 0 0.3rem;
+  font-weight: 600;
+  color: #e2e8f0;
 }
 
 .message-content h4,
 .message-content h5,
 .message-content h6 {
-  font-size: 13.5px;
-  line-height: 1.5;
-  margin: 0.5rem 0 0.25rem;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0.6rem 0 0.25rem;
   font-weight: 600;
   color: var(--color-ink);
+}
+
+.message-content strong,
+.message-content b {
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .message-content ul {

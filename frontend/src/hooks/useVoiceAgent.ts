@@ -29,6 +29,14 @@ export function sanitizeDialogueText(text: string): string {
     .trim();
 }
 
+/** Preprocess markdown content for visual display, preserving all headings, bolding, lists, and code blocks. */
+export function sanitizeDisplayText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{200D}]|[\u{FE0F}]|[\u{1FA00}-\u{1FAFF}]|[\u{1F000}-\u{1F02F}]/gu, '')
+    .trim();
+}
+
 /** Determine smart separator between two streamed chunks. */
 function chunkSeparator(existing: string, incoming: string): string {
   const isBulletOrList = /^[-*•]\s+|^\d+\.\s+/.test(incoming.trim());
@@ -275,7 +283,7 @@ export function useVoiceAgent() {
     const seq = turnRef.current.seq;
 
     const cleanContent = sanitizeDialogueText(rawContent);
-    const cleanDisplay = rawDisplay ? sanitizeDialogueText(rawDisplay) : undefined;
+    const cleanDisplay = rawDisplay ? sanitizeDisplayText(rawDisplay) : undefined;
     const cleanSpeech  = rawSpeech  ? sanitizeDialogueText(rawSpeech)  : undefined;
 
     // Update subtitle with latest speech text
@@ -288,22 +296,53 @@ export function useVoiceAgent() {
         // ── Append to existing turn entry ────────────────────────────────────
         const sep = chunkSeparator(last.content, cleanContent);
 
-        const updatedContent = `${last.content}${sep}${cleanContent}`.trim();
+        // Content
+        let updatedContent: string;
+        if (!last.content) {
+          updatedContent = cleanContent;
+        } else if (cleanContent.startsWith(last.content)) {
+          updatedContent = cleanContent;
+        } else if (last.content.endsWith(cleanContent)) {
+          updatedContent = last.content;
+        } else {
+          updatedContent = `${last.content}${sep}${cleanContent}`.trim();
+        }
 
-        // Accumulate display.content — do NOT replace it
+        // Display markdown (rich formatting, headings, bullets, code)
         const existingDisplay = last.display?.content || '';
-        const updatedDisplay = cleanDisplay
-          ? {
-              format: 'markdown' as const,
-              content: existingDisplay
-                ? `${existingDisplay}${sep}${cleanDisplay}`.trim()
-                : cleanDisplay,
-            }
-          : last.display;
+        let updatedDisplay = last.display;
+        if (cleanDisplay) {
+          let finalDisplayContent: string;
+          if (!existingDisplay) {
+            finalDisplayContent = cleanDisplay;
+          } else if (cleanDisplay.startsWith(existingDisplay)) {
+            // Snapshot streaming (full markdown received so far)
+            finalDisplayContent = cleanDisplay;
+          } else if (existingDisplay.endsWith(cleanDisplay)) {
+            finalDisplayContent = existingDisplay;
+          } else {
+            finalDisplayContent = `${existingDisplay}${sep}${cleanDisplay}`.trim();
+          }
+          updatedDisplay = {
+            format: 'markdown' as const,
+            content: finalDisplayContent,
+          };
+        }
 
-        const updatedSpeech = cleanSpeech
-          ? { text: `${last.speech?.text || last.content} ${cleanSpeech}`.trim() }
-          : last.speech;
+        // Speech audio text
+        let updatedSpeech = last.speech;
+        if (cleanSpeech) {
+          const existingSpeech = last.speech?.text || '';
+          let finalSpeech: string;
+          if (!existingSpeech) {
+            finalSpeech = cleanSpeech;
+          } else if (cleanSpeech.startsWith(existingSpeech)) {
+            finalSpeech = cleanSpeech;
+          } else {
+            finalSpeech = `${existingSpeech} ${cleanSpeech}`.trim();
+          }
+          updatedSpeech = { text: finalSpeech };
+        }
 
         return [
           ...prev.slice(0, -1),
