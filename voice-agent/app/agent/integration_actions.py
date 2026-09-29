@@ -51,6 +51,16 @@ def plan_integration_actions(user_text: str) -> List[PlannedIntegrationAction]:
             required_app="GOOGLECALENDAR" if "google" in text else "",
         ))
 
+    wants_search = bool(re.search(r"\b(search the web|search online|search google|look up online|latest news on|latest updates? on)\b", text))
+    if wants_search:
+        search_query = re.sub(r"^(?:please\s+)?(?:search\s+(?:the\s+web|online|google)?(?:\s+for)?|look\s+up\s+online(?:\s+for)?|latest\s+(?:news|updates?)\s+on)\s+", "", text, flags=re.IGNORECASE).strip()
+        actions.append(PlannedIntegrationAction(
+            tool_name="web_search_serpapi",
+            arguments={"query": search_query or text},
+            capability="search",
+            required_app="SERPAPI",
+        ))
+
     return actions
 
 
@@ -99,7 +109,7 @@ async def execute_requested_integration_actions(
     }
 
 
-def format_integration_response(execution: Dict[str, Any]) -> str:
+def format_integration_response(execution: Dict[str, Any], filler_spoken: bool = False) -> str:
     """Return an evidence-based combined response for the completed actions."""
     parts: List[str] = []
     for result in execution["results"]:
@@ -110,14 +120,27 @@ def format_integration_response(execution: Dict[str, Any]) -> str:
             emails = result.get("emails", [])
             if emails:
                 lines = "; ".join(f"{email.get('sender', 'Unknown')}: {email.get('subject', 'No subject')}" for email in emails[:5])
-                parts.append(f"Recent email: {lines}.")
+                lead = "Found them. " if filler_spoken else ""
+                parts.append(f"{lead}Recent email: {lines}.")
             else:
                 parts.append(result.get("spoken_summary", "No recent emails found."))
         elif result["tool_name"] == "list_calendar_events":
             events = result.get("events", [])
             if events:
                 lines = "; ".join(f"{event.get('title', 'Untitled Meeting')} at {event.get('start', 'the scheduled time')}" for event in events[:5])
-                parts.append(f"Upcoming calendar events: {lines}.")
+                lead = "Here is what's on your schedule. " if filler_spoken else ""
+                parts.append(f"{lead}Upcoming calendar events: {lines}.")
             else:
                 parts.append(result.get("spoken_summary", "No upcoming calendar events found."))
+        elif result["tool_name"] in ("web_search_serpapi", "tavily_search"):
+            res = result.get("results") or result.get("data")
+            if res:
+                if isinstance(res, list):
+                    summary = "; ".join(str(item) for item in res[:3])
+                else:
+                    summary = str(res)
+                lead = "Here is what I found online: " if filler_spoken else "Search results: "
+                parts.append(f"{lead}{summary}")
+            else:
+                parts.append(result.get("spoken_summary", "No search results found."))
     return " ".join(parts) or "I couldn't complete the requested integration actions."

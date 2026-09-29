@@ -12,6 +12,7 @@ import re
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from app.agent.persona.service import persona_service
+from app.agent.verbal_feedback import get_contextual_verbal_filler
 from app.agent.integration_actions import (
     execute_requested_integration_actions,
     format_integration_response,
@@ -264,6 +265,21 @@ class DualStreamVoiceOrchestrator:
             await self._send_event({"type": "SessionStateChange", "state": self.state.value})
             await self._send_event({"type": "AgentThinking"})
 
+            # Verbal turn-holding: detect if this turn triggers an external tool action
+            filler = get_contextual_verbal_filler(user_text)
+            filler_task: Optional[asyncio.Task] = None
+            if filler:
+                # 1. Provide immediate subtitle and activity feedback to client
+                await self._send_event({
+                    "type": "ConversationText",
+                    "role": "assistant",
+                    "content": filler,
+                    "display_markdown": f"*{filler}*",
+                    "speech_text": filler,
+                })
+                # 2. Concurrently stream spoken verbal filler over the TTS hot-path
+                filler_task = asyncio.create_task(self._speak_sentence_chunk(filler))
+
             # A connection lookup is only a precondition.  For a supported
             # integration request, execute every planned read action here before
             # generating a response so the model cannot stop after merely
@@ -275,10 +291,15 @@ class DualStreamVoiceOrchestrator:
                 on_activity=self._send_event,
             )
             if integration_execution is not None:
+                if filler_task and not filler_task.done():
+                    await filler_task
                 await self._deliver_completed_integration_turn(
-                    format_integration_response(integration_execution)
+                    format_integration_response(integration_execution, filler_spoken=bool(filler))
                 )
                 return
+
+            if filler_task and not filler_task.done():
+                await filler_task
 
             # Build system instructions
             instructions = persona_service.get_voice_instructions(
