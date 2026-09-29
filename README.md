@@ -82,20 +82,20 @@ The production readiness work is tracked in [the implementation plan](docs/plans
 
 ```mermaid
 flowchart TB
-    subgraph HotPath ["VOICE HOT-PATH (Real-Time Audio Plane)"]
-        Mic["Microphone Input (16kHz Linear PCM)"]
-        AudioWorklet["AudioWorklet Node (Noise/Echo Cancelling)"]
-        DG_STT["Deepgram Nova-2 STT (End-of-Turn VAD)"]
-        DG_TTS["Deepgram Aura-2 / Flux TTS (24kHz Raw PCM)"]
-        Speaker["Gapless Speaker Playback (AudioBufferQueue)"]
+    subgraph HotPath["VOICE HOT-PATH - Real-Time Audio Plane"]
+        Mic["Microphone Input - 16kHz Linear PCM"]
+        AudioWorklet["AudioWorklet Node - Noise and Echo Cancelling"]
+        DG_STT["Deepgram Nova-2 STT - End-of-Turn VAD"]
+        DG_TTS["Deepgram Aura-2 / Flux TTS - 24kHz Raw PCM"]
+        Speaker["Gapless Speaker Playback - AudioBufferQueue"]
     end
 
-    subgraph ReasoningPlane ["INTELLIGENCE & ACTION PLANE"]
-        Groq["Groq Cloud LPU (Llama 3.3 70B ~300 tps)"]
-        Distiller["Speech Payload Distiller (Max 1200 chars)"]
-        Registry["Tool Registry (17 Tools / Safety Boundary)"]
-        Composio["Composio OAuth Gateway (Workspace & Search)"]
-        Neon["Neon Serverless PostgreSQL (Memory & Transcripts)"]
+    subgraph ReasoningPlane["INTELLIGENCE & ACTION PLANE"]
+        Groq["Groq Cloud LPU - Llama 3.3 70B ~300 tps"]
+        Distiller["Speech Payload Distiller - Max 1200 chars"]
+        Registry["Tool Registry - 17 Tools / Safety Boundary"]
+        Composio["Composio OAuth Gateway - Workspace and Search"]
+        Neon["Neon Serverless PostgreSQL - Memory and Transcripts"]
     end
 
     Mic --> AudioWorklet
@@ -116,22 +116,22 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as "Client (React / Three.js)"
-    participant GW as "FastAPI Voice Gateway"
-    participant DG as "Deepgram Voice Agent API"
-    participant Groq as "Groq LPU (Llama 3.3 70B)"
-    participant Tool as "Tool Registry & Composio"
-    participant DB as "Neon PostgreSQL"
+    actor Client as Client (React / Three.js)
+    participant GW as FastAPI Voice Gateway
+    participant DG as Deepgram Voice Agent API
+    participant Groq as Groq LPU (Llama 3.3 70B)
+    participant Tool as Tool Registry & Composio
+    participant DB as Neon PostgreSQL
 
     Client->>GW: POST /api/voice/sessions (user_id, persona, voice_model)
-    GW-->>Client: { session_id, status: "created" }
+    GW-->>Client: Session created with session_id
 
     Client->>GW: WS Connect /api/voice/ws/{session_id}
     GW->>DB: Hydrate recent user memories & persona profile
     DB-->>GW: User memory facts & preferences
     GW->>DG: Connect WebSocket & Send SettingsConfiguration
     DG-->>GW: SettingsApplied
-    GW-->>Client: SessionStateChange ("CONNECTED" -> "LISTENING")
+    GW-->>Client: SessionStateChange: CONNECTED to LISTENING
 
     Note over Client,DG: Natural Conversational Turn
     Client->>GW: Stream 16kHz PCM audio bytes
@@ -139,19 +139,19 @@ sequenceDiagram
     DG->>Groq: Stream transcript tokens
     Groq-->>DG: Generated tokens
     DG-->>GW: Stream 24kHz synthesized audio
-    GW-->>Client: Stream PCM audio -> AudioBufferSourceNode
+    GW-->>Client: Stream PCM audio to AudioBufferSourceNode
 
     Note over Groq,Tool: Tool Execution with Confirmation Gate
-    Groq->>DG: FunctionCallRequest ("send_email", recipient, body)
+    Groq->>DG: FunctionCallRequest: send_email(recipient, body)
     DG->>GW: Forward FunctionCallRequest
     GW->>Tool: Execute send_email (confirmed=False)
-    Tool-->>GW: { requires_confirmation: true, spoken_summary: "I have prepared..." }
+    Tool-->>GW: Proposal summary requiring verbal confirmation
     GW->>DG: FunctionCallResponse (distilled proposal)
     DG->>Groq: Generate verbal confirmation question
-    Groq-->>Client: "I have prepared an email to... Should I send it?"
+    Groq-->>Client: Spoken confirmation prompt: I have prepared an email... Should I send it?
 
     Note over Client,DG: Barge-In Interruption Handling
-    Client->>GW: User speaks ("Yes, send it now")
+    Client->>GW: User speaks: Yes, send it now
     GW->>DG: Forward audio
     DG-->>GW: UserStartedSpeaking event
     GW-->>Client: Suppress active audio playback immediately
@@ -434,11 +434,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 Pytest discovers all unit, integration, and local end-to-end tests. Its fixtures clear vendor credentials before application imports, isolate shared state, and reject unexpected external network calls. Successful provider interactions use explicit fakes. These tests do not establish live speech quality or production authentication readiness.
 
 ```bash
-# Canonical command from the repository root
+# Canonical test suite execution from repository root
 uv run --locked --extra dev python -m pytest -q
-
-# Compatibility entry point; delegates to the same pytest suite
-uv run --locked --extra dev python voice-agent/tests/run_all_tests.py -q
 ```
 
 ### Release Artifact Checks
