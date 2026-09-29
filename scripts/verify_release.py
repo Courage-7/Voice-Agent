@@ -24,6 +24,7 @@ import sys
 from unittest.mock import AsyncMock, patch
 
 os.environ["ENVIRONMENT"] = "testing"
+os.environ["VOICE_PIPELINE_MODE"] = "deepgram_agent"
 for name in ("DEEPGRAM_API_KEY", "GROQ_API_KEY", "COMPOSIO_API_KEY", "DATABASE_URL", "NEON_DATABASE_URL"):
     os.environ[name] = ""
 if len(sys.argv) > 1:

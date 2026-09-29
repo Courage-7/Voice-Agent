@@ -230,6 +230,25 @@ The repository accumulated unused modules and duplicate string transformation pa
 
 ---
 
+## Issue 7: CI Backend Release Verification Failure (Pipeline Mode Mismatch)
+
+### 1. Problem Statement
+The GitHub Actions CI workflow failed during the `Build and verify installed wheel` step:
+`AssertionError: Expected mock to have been awaited once. Awaited 0 times.` while testing `scripts/verify_release.py`.
+
+### 2. Root Cause Analysis
+* The smoke verification harness (`scripts/verify_release.py`) mocks `DeepgramVoiceAgentSession` with fake credentials to test packaged wheel installation, HTTP routes, and WebSocket endpoints in a clean container with zero external network access.
+* The application configuration defaults `voice_pipeline_mode: "decoupled"`. Under decoupled mode, `RealtimeClientSession` instantiates `DualStreamVoiceOrchestrator` instead of `DeepgramVoiceAgentSession`.
+* Because `verify_release.py` did not set `VOICE_PIPELINE_MODE="deepgram_agent"`, the application executed `DualStreamVoiceOrchestrator`, leaving the `DeepgramVoiceAgentSession` mocks uninvoked and causing `DualStreamVoiceOrchestrator.connect()` to fail on empty credentials.
+
+### 3. Implementation & Solution
+Updated [`scripts/verify_release.py`](file:///c:/Users/coura/OneDrive/Desktop/VoiceAgent/scripts/verify_release.py):
+* Set `os.environ["VOICE_PIPELINE_MODE"] = "deepgram_agent"` within the isolated smoke test environment.
+* Verified both wheel extraction and image verification pass with code 0:
+  `PASS: installed backend, packaged HTML, frontend assets, API and fake-provider WebSocket`.
+
+---
+
 ## Summary of Key Takeaways for Future Voice AI Systems
 
 | Dimension | Anti-Pattern | Recommended Architecture |
@@ -239,6 +258,8 @@ The repository accumulated unused modules and duplicate string transformation pa
 | **Streaming UI** | Naive string concatenation | **Snapshot-Aware In-Place Updates**: Distinguish deltas from cumulative snapshots to prevent duplicate bubbles. |
 | **UI Visualizer** | High-contrast neon wireframes with chaotic rotation | **Organic Acoustic Harmonic Orb**: Smooth physical materials, subtle displacement, and calm ambient depth. |
 | **Documentation** | Unverified Mermaid syntax and stale test scripts | **Parser-Validated Diagrams**: Standardized flowchart and sequence syntax; verified canonical commands. |
+| **CI Smoke Testing** | Assuming default settings match test mock targets | **Explicit Environment Configuration**: Explicitly set engine mode flags (`VOICE_PIPELINE_MODE`) in hermetic test scripts. |
 
 ---
 *Created as an engineering reference and technical learning record for the Voice Agent project.*
+
