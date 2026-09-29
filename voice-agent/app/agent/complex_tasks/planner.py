@@ -155,6 +155,67 @@ class ComplexTaskPlanner:
                 )
             )
 
+        elif "notion" in goal_lower and ("doc" in goal_lower or "page" in goal_lower or "note" in goal_lower or "save" in goal_lower):
+            steps.append(
+                TaskStep(
+                    step_id=1,
+                    description=f"Gather information for '{goal}'",
+                    tool_name="web_search_serpapi",
+                    arguments={"query": context.get("query", goal)},
+                    status="pending",
+                    result=None,
+                )
+            )
+            steps.append(
+                TaskStep(
+                    step_id=2,
+                    description="Create notes page in Notion",
+                    tool_name="execute_app_action",
+                    arguments={
+                        "app_name": "notion",
+                        "intent": "create",
+                        "parameters": {
+                            "title": context.get("title", f"Notes: {goal[:30]}"),
+                            "content": context.get("content", "Synthesized findings..."),
+                        },
+                    },
+                    status="pending",
+                    result=None,
+                )
+            )
+
+        elif any(app in goal_lower for app in ("teams", "whatsapp", "telegram")) and any(act in goal_lower for act in ("send", "message", "notify")):
+            target_app = "microsoft_teams" if "teams" in goal_lower else ("whatsapp" if "whatsapp" in goal_lower else "telegram")
+            steps.append(
+                TaskStep(
+                    step_id=1,
+                    description=f"Send notification message via {target_app.replace('_', ' ').title()}",
+                    tool_name="execute_app_action",
+                    arguments={
+                        "app_name": target_app,
+                        "intent": "send",
+                        "parameters": {
+                            "message": context.get("message", goal),
+                            "recipient": context.get("recipient", "general"),
+                        },
+                    },
+                    status="pending",
+                    result=None,
+                )
+            )
+
+        elif "drive" in goal_lower and any(kw in goal_lower for kw in ("search", "find", "locate")):
+            steps.append(
+                TaskStep(
+                    step_id=1,
+                    description="Search Google Drive for matching files",
+                    tool_name="search_google_drive",
+                    arguments={"query": context.get("query", goal), "max_results": 5},
+                    status="pending",
+                    result=None,
+                )
+            )
+
         else:
             steps.append(
                 TaskStep(

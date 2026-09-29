@@ -12,7 +12,9 @@ A comprehensive learning record and technical post-mortem documenting architectu
 5. [Issue 4: UI/UX Friction & Distracting Visualizer Aesthetics](#issue-4-uiux-friction--distracting-visualizer-aesthetics)
 6. [Issue 5: Markdown Mermaid Diagram Rendering Failures](#issue-5-markdown-mermaid-diagram-rendering-failures)
 7. [Issue 6: Dead Code, Redundant Logic & Handler Stubs](#issue-6-dead-code-redundant-logic--handler-stubs)
-8. [Summary of Key Takeaways for Future Voice AI Systems](#summary-of-key-takeaways-for-future-voice-ai-systems)
+8. [Issue 7: CI Backend Release Verification Failure (Pipeline Mode Mismatch)](#issue-7-ci-backend-release-verification-failure-pipeline-mode-mismatch)
+9. [Issue 8: Composio App Catalog Documentation Gaps & Tool-Level Composite Skills Under-Utilization](#issue-8-composio-app-catalog-documentation-gaps--tool-level-composite-skills-under-utilization)
+10. [Summary of Key Takeaways for Future Voice AI Systems](#summary-of-key-takeaways-for-future-voice-ai-systems)
 
 ---
 
@@ -249,6 +251,41 @@ Updated [`scripts/verify_release.py`](file:///c:/Users/coura/OneDrive/Desktop/Vo
 
 ---
 
+## Issue 8: Composio App Catalog Documentation Gaps & Tool-Level Composite Skills Under-Utilization
+
+### 1. Problem Statement
+* Composio integrations were under-documented across the codebase. While 17 apps were configured in `client.py`, the repository lacked a dedicated architecture guide detailing actions, scopes, auth schemes, and setup.
+* Tool-level composite skills (e.g. Research ➔ Document, Email ➔ Sheet, Calendar Check ➔ Book, Notes ➔ Notion, Teams/WhatsApp Broadcast) were underutilized because:
+  1. The LLM system instructions in `system.py` only explained atomic operations and never trained the agent to invoke `run_complex_task`.
+  2. Newly connected apps that rely on dynamic execution (Notion, Microsoft Teams, WhatsApp, Telegram, LinkedIn, Neon) were not being hydrated into active Deepgram/Groq function-calling schemas because meta-tools were unconditionally excluded.
+  3. Pipelined voice hot-path actions only recognized Gmail, Calendar, and SerpApi, ignoring Drive, Notion, and composite workflows.
+
+### 2. Root Cause Analysis
+1. **Schema Exclusion Bug**: In `app/tools/registry.py`, `include_meta_tools=False` by default, which unconditionally stripped `execute_app_action` from live schemas. Because apps like Notion or Teams don't have static dedicated tool classes (like `GoogleDocsTool`), their schemas were never delivered to Deepgram.
+2. **Missing System Prompt Directives**: The system prompt lacked instructions explaining the difference between atomic app actions and multi-step composite skills (`run_complex_task`), causing the model to attempt sequential atomic calls or refuse complex workflows.
+3. **Incomplete Skills Registry**: `resolve_skill_steps()` in `client.py` and fallback heuristics in `planner.py` only covered 3 skills, lacking Notion knowledge capture, multi-platform team notifications, and Google Drive retrieval.
+
+### 3. Devised Approach & Architectural Solution
+1. **Dynamic Tool Hydration (`registry.py`)**:
+   - Updated `ToolRegistry.get_deepgram_function_schemas()`: when user-connected accounts include dynamic-only apps (`NOTION`, `MICROSOFT_TEAMS`, `WHATSAPP`, `TELEGRAM`, `LINKEDIN`, `NEON`, `I_LOVE_PDF`), `execute_app_action` is automatically included in the schemas.
+   - When only standard Google/Search tools are connected, `execute_app_action` remains excluded to avoid semantic competition with dedicated tools.
+2. **Expanded Composite Skills (`client.py` & `planner.py`)**:
+   - Added Skill 4: **Research & Knowledge Capture into Notion** (Perplexity/SerpApi ➔ Notion page create).
+   - Added Skill 5: **Multi-Platform Messaging Dispatch** (Teams / WhatsApp / Telegram send).
+   - Added Skill 6: **Drive Document Search & Retrieval** (`search_google_drive`).
+   - Added corresponding fallback heuristics in `ComplexTaskPlanner`.
+3. **Pipelined Read Operations (`integration_actions.py`)**:
+   - Added Google Drive search and Notion page search to `plan_integration_actions()` and formatted results in `format_integration_response()`.
+4. **Contextual Verbal Turn-Holding (`verbal_feedback.py`)**:
+   - Added organic turn-holding phrases for Notion (*"Checking your Notion workspace..."*), Messaging (*"Preparing that message for you right now..."*), and Composite Workflows (*"On it, gathering that information and preparing the details..."*).
+5. **System Prompt Directives (`system.py`)**:
+   - Added Rule 10 explicitly instructing the model on all 17 Composio apps, atomic vs composite tasks, and write confirmation boundaries.
+6. **Comprehensive Architectural Reference**:
+   - Authored [`docs/architecture/composio_integrations.md`](file:///c:/Users/coura/OneDrive/Desktop/VoiceAgent/docs/architecture/composio_integrations.md) covering all 17 apps, OAuth 2.0 lifecycle, write confirmation gates, execution ledger, and composite skills.
+   - Updated [`README.md`](file:///c:/Users/coura/OneDrive/Desktop/VoiceAgent/README.md) with an interactive table and cross-references.
+
+---
+
 ## Summary of Key Takeaways for Future Voice AI Systems
 
 | Dimension | Anti-Pattern | Recommended Architecture |
@@ -259,6 +296,7 @@ Updated [`scripts/verify_release.py`](file:///c:/Users/coura/OneDrive/Desktop/Vo
 | **UI Visualizer** | High-contrast neon wireframes with chaotic rotation | **Organic Acoustic Harmonic Orb**: Smooth physical materials, subtle displacement, and calm ambient depth. |
 | **Documentation** | Unverified Mermaid syntax and stale test scripts | **Parser-Validated Diagrams**: Standardized flowchart and sequence syntax; verified canonical commands. |
 | **CI Smoke Testing** | Assuming default settings match test mock targets | **Explicit Environment Configuration**: Explicitly set engine mode flags (`VOICE_PIPELINE_MODE`) in hermetic test scripts. |
+| **Integration Architecture** | Treating OAuth providers as silent static links | **Active Tool & Skills Gateway**: User-scoped session isolation, dynamic tool schema hydration, composite multi-app skills (`run_complex_task`), and write safety boundaries. |
 
 ---
 *Created as an engineering reference and technical learning record for the Voice Agent project.*

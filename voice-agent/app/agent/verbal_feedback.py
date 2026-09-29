@@ -146,5 +146,36 @@ def get_contextual_verbal_filler(user_text: str, turn_seed: int = 0) -> Optional
         ]
         return variations[salt % len(variations)]
 
+    # 5. Notion & Knowledge Notes
+    is_notion = bool(re.search(r"\b(notion|notes?|wiki)\b", lower)) and bool(re.search(r"\b(find|check|search|look|open|save|create|page)\b", lower))
+    if is_notion:
+        variations = [
+            "Checking your Notion workspace...",
+            "Looking through your notes in Notion...",
+            "Pulling up your Notion pages right now...",
+            "Let me check your notes real quick...",
+        ]
+        return variations[salt % len(variations)]
+
+    # 6. Messaging & Chat Notifications (Teams / WhatsApp / Telegram)
+    is_msg = any(app in lower for app in ("teams", "whatsapp", "telegram")) and any(act in lower for act in ("send", "message", "text", "notify", "broadcast", "post"))
+    if is_msg:
+        variations = [
+            "Preparing that message for you right now...",
+            "Drafting that update right now...",
+            "Getting that message ready for you...",
+        ]
+        return variations[salt % len(variations)]
+
+    # 7. Composite Multi-Step Workflows
+    is_composite = any(kw in lower for kw in ("research", "search", "email")) and any(out in lower for out in ("doc", "document", "sheet", "spreadsheet", "log", "summary"))
+    if is_composite:
+        variations = [
+            "On it, gathering that information and preparing the details...",
+            "Starting on that workflow for you right now...",
+            "Looking into that and putting the document together...",
+        ]
+        return variations[salt % len(variations)]
+
     # Pure conversational turn (no external tool filler needed)
     return None

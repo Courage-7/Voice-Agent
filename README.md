@@ -228,8 +228,37 @@ if tool.requires_confirmation and not effective_confirmed:
 ```
 </details>
 
+<details open>
+<summary><b>4. Composio Workspace Integrations & Composite Skills</b></summary>
+<br/>
+
+> 📖 **Comprehensive Guide**: See the complete architectural specification in [**`docs/architecture/composio_integrations.md`**](docs/architecture/composio_integrations.md).
+
+Shinra utilizes Composio as an active **Tool Execution and Skills Gateway** supporting 17 baseline enterprise applications across 4 domains:
+
+* **Communication**: Gmail, Microsoft Outlook 365, Microsoft Teams, WhatsApp, Telegram, LinkedIn.
+* **Productivity & Workspace**: Google Calendar, Google Docs, Google Sheets, Google Drive, Notion, iLovePDF.
+* **Search & Research**: SerpApi (Google Search), Perplexity AI, Tavily Search.
+* **Database & Voice**: Neon Serverless PostgreSQL, Vapi Voice AI.
+
+#### Tool-Level Composite Skills (`run_complex_task`)
+Beyond atomic tool execution, the agent dynamically plans and executes multi-step composite workflows:
+
+| Composite Skill | Pipeline & Tools Involved | Voice Trigger Example |
+| :--- | :--- | :--- |
+| **Research & Doc Compilation** | `perplexity_ai_research` / `web_search_serpapi` ➔ `manage_google_doc` | *"Research AI agent architectures and save the findings into a Google Doc."* |
+| **Inbox Triage & Spreadsheet** | `search_emails` ➔ `manage_google_sheet` | *"Check my unread client emails and log them into my spreadsheet."* |
+| **Calendar Check & Scheduling** | `list_calendar_events` ➔ `create_calendar_event` | *"Check my availability tomorrow morning and schedule a sync with Alex."* |
+| **Knowledge Capture into Notion** | `web_search_serpapi` ➔ `execute_app_action(notion, create)` | *"Research latest robotics news and create a notes page in Notion."* |
+| **Team Messaging Dispatch** | Contextual synthesis ➔ `execute_app_action(teams/whatsapp, send)` | *"Send an update on Teams to let the team know the release build passed."* |
+| **Drive Document Retrieval** | `search_google_drive` ➔ Speech synthesis | *"Find my quarterly financial model in Google Drive and summarize the key figures."* |
+
+#### Dynamic Tool Hydration
+Connected apps are discovered per-user via `GET /api/integrations/status?user_id=...`. When dynamic-only apps (Notion, Microsoft Teams, WhatsApp, Telegram, LinkedIn, Neon) are connected, [`ToolRegistry`](voice-agent/app/tools/registry.py) automatically exposes `execute_app_action` to Deepgram and Groq function-calling schemas, ensuring instant tool availability without restarting the backend.
+</details>
+
 <details>
-<summary><b>4. Token Distillation & Speech Budget Gateway</b></summary>
+<summary><b>5. Token Distillation & Speech Budget Gateway</b></summary>
 <br/>
 
 Real-time voice models fail or degrade into lengthy monologues when external tools return massive JSON payloads (e.g. 50 raw emails or huge search scrapes).

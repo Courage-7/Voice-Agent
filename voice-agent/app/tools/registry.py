@@ -94,8 +94,20 @@ class ToolRegistry:
         Excludes broad meta-tools like 'execute_app_action' by default to avoid semantic competition.
         """
         tools = self.get_tools_for_capabilities(capabilities, connected_apps=connected_apps)
-        if not include_meta_tools:
+
+        # Include execute_app_action when dynamic-only apps (Notion, Teams, WhatsApp, Telegram, LinkedIn, Neon, etc.)
+        # are actively connected so the model has functional schemas to invoke them.
+        dynamic_only_apps = {
+            "NOTION", "MICROSOFT_TEAMS", "MICROSOFTTEAMS", "WHATSAPP", "TELEGRAM",
+            "LINKEDIN", "NEON", "I_LOVE_PDF", "ILOVEPDF", "VAPI"
+        }
+        has_dynamic_app = bool(
+            connected_apps and any(canonical_app_slug(a) in dynamic_only_apps for a in connected_apps)
+        )
+
+        if not include_meta_tools and not has_dynamic_app:
             # Exclude broad catch-all dynamic execution meta-tools from live Deepgram schemas
+            # unless an actively connected app specifically requires dynamic execution.
             tools = [t for t in tools if t.name != "execute_app_action"]
         return [t.to_deepgram_schema() for t in tools]
 

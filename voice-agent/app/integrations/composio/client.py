@@ -480,7 +480,7 @@ class ComposioGateway:
             steps: List[Dict[str, Any]] = []
 
             # Skill 1: Research & Document Compilation (Tavily/Perplexity/SerpApi -> Google Docs)
-            if ("research" in goal_lower or "search" in goal_lower) and ("doc" in goal_lower or "document" in goal_lower or "notes" in goal_lower):
+            if "notion" not in goal_lower and "drive" not in goal_lower and ("research" in goal_lower or "search" in goal_lower) and ("doc" in goal_lower or "document" in goal_lower or "notes" in goal_lower):
                 query = context.get("query") or context.get("prompt") or goal
                 use_tavily = "TAVILY" in connected_apps
                 use_perplexity = "PERPLEXITYAI" in connected_apps
@@ -543,6 +543,56 @@ class ComposioGateway:
                             "start_time": context.get("start_time", "tomorrow at 10 AM"),
                         },
                     })
+                return steps
+
+            # Skill 4: Research & Knowledge Capture into Notion
+            if "notion" in goal_lower and ("doc" in goal_lower or "page" in goal_lower or "note" in goal_lower or "research" in goal_lower or "save" in goal_lower):
+                query = context.get("query") or context.get("prompt") or goal
+                use_perplexity = "PERPLEXITYAI" in connected_apps
+                research_tool = "perplexity_ai_research" if use_perplexity else "web_search_serpapi"
+                steps.append({
+                    "description": f"Gather research notes on '{query[:60]}'",
+                    "tool_name": research_tool,
+                    "arguments": {"prompt" if use_perplexity else "query": query},
+                })
+                steps.append({
+                    "description": "Create a structured notes page in Notion",
+                    "tool_name": "execute_app_action",
+                    "arguments": {
+                        "app_name": "notion",
+                        "intent": "create",
+                        "parameters": {
+                            "title": context.get("title") or f"Notes: {query[:40]}",
+                            "content": context.get("content", "Synthesized findings and takeaways..."),
+                        },
+                    },
+                })
+                return steps
+
+            # Skill 5: Multi-Platform Messaging & Notification Dispatch (Teams / WhatsApp / Telegram)
+            if any(app in goal_lower for app in ("teams", "microsoft teams", "whatsapp", "telegram")) and any(act in goal_lower for act in ("send", "message", "notify", "broadcast", "post")):
+                target_app = "microsoft_teams" if "teams" in goal_lower else ("whatsapp" if "whatsapp" in goal_lower else "telegram")
+                steps.append({
+                    "description": f"Send notification message via {target_app.replace('_', ' ').title()}",
+                    "tool_name": "execute_app_action",
+                    "arguments": {
+                        "app_name": target_app,
+                        "intent": "send",
+                        "parameters": {
+                            "message": context.get("message") or context.get("content") or goal,
+                            "recipient": context.get("recipient", "general"),
+                        },
+                    },
+                })
+                return steps
+
+            # Skill 6: Drive Document Search & Synthesis
+            if "drive" in goal_lower and any(kw in goal_lower for kw in ("search", "find", "locate", "document", "file")):
+                steps.append({
+                    "description": "Search Google Drive for matching workspace documents",
+                    "tool_name": "search_google_drive",
+                    "arguments": {"query": context.get("query", goal), "max_results": 5},
+                })
                 return steps
 
             return []

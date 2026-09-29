@@ -61,6 +61,26 @@ def plan_integration_actions(user_text: str) -> List[PlannedIntegrationAction]:
             required_app="SERPAPI",
         ))
 
+    wants_drive = bool(re.search(r"\b(google drive|drive|my drive)\b", text)) and bool(re.search(r"\b(search|find|list|locate|files?|docs?|documents?)\b", text))
+    if wants_drive:
+        drive_query = re.sub(r"^(?:please\s+)?(?:search\s+(?:google\s+drive|my\s+drive|drive)?(?:\s+for)?|find\s+(?:files?|documents?|docs?)?(?:\s+in\s+drive)?)\s+", "", text, flags=re.IGNORECASE).strip()
+        actions.append(PlannedIntegrationAction(
+            tool_name="search_google_drive",
+            arguments={"query": drive_query or text, "max_results": 5},
+            capability="workspace",
+            required_app="GOOGLEDRIVE",
+        ))
+
+    wants_notion = bool(re.search(r"\bnotion\b", text)) and bool(re.search(r"\b(search|find|look\s+up|pages?|notes?)\b", text))
+    if wants_notion:
+        notion_query = re.sub(r"^(?:please\s+)?(?:search\s+notion(?:\s+for)?|find\s+in\s+notion|look\s+up\s+in\s+notion)\s+", "", text, flags=re.IGNORECASE).strip()
+        actions.append(PlannedIntegrationAction(
+            tool_name="execute_app_action",
+            arguments={"app_name": "notion", "intent": "search", "parameters": {"query": notion_query or text}},
+            capability="workspace",
+            required_app="NOTION",
+        ))
+
     return actions
 
 
@@ -143,4 +163,14 @@ def format_integration_response(execution: Dict[str, Any], filler_spoken: bool =
                 parts.append(f"{lead}{summary}")
             else:
                 parts.append(result.get("spoken_summary", "No search results found."))
+        elif result["tool_name"] == "search_google_drive":
+            files = result.get("files", [])
+            if files:
+                lines = "; ".join(f"{f.get('name', 'Untitled')}" for f in files[:5])
+                lead = "Found these files on Google Drive: " if filler_spoken else "Google Drive files: "
+                parts.append(f"{lead}{lines}.")
+            else:
+                parts.append(result.get("spoken_summary", "No matching files found on Google Drive."))
+        elif result["tool_name"] == "execute_app_action":
+            parts.append(result.get("spoken_summary") or "Action on connected app completed.")
     return " ".join(parts) or "I couldn't complete the requested integration actions."
