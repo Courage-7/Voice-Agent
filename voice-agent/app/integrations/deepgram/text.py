@@ -23,11 +23,10 @@ def normalize_for_speech(text: str) -> str:
 
 
 def normalize_for_display(text: str) -> str:
-    """Prepare concise, safe Markdown for the transcript UI."""
+    """Prepare clean, well-formatted Markdown for the transcript UI."""
     if not text:
         return ""
+    # Strip emojis and pictographs, preserving all Markdown syntax (headers, bold, lists, code)
     cleaned = re.sub(r'[\U00010000-\U0010ffff]', '', text)
     cleaned = re.sub(r'[\u2600-\u27bf\u2300-\u23ff\u2b50\ufe0f\u200d]', '', cleaned)
-    cleaned = re.sub(r'^#{1,6}\s+', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', cleaned)
-    return re.sub(r'\*{1,3}', '', cleaned).strip()
+    return cleaned.strip()

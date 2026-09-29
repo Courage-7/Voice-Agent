@@ -24,6 +24,7 @@ from app.integrations.llm.client import groq_client
 from app.memory.service import memory_service
 from app.observability.metrics import metrics_collector
 from app.realtime.state import SessionState
+from app.shared.utils import clean_voice_text, extract_dual_stream_tags
 from app.users.service import user_service
 from app.voice.catalog import voice_catalog_service
 
@@ -331,8 +332,18 @@ class DualStreamVoiceOrchestrator:
             async for delta in groq_client.stream_chat_completion(messages=messages):
                 full_response_text += delta
 
-                current_display = extract_tag(full_response_text, "display")
-                current_speech = extract_tag(full_response_text, "speech")
+                has_display_tag = "<display>" in full_response_text
+                has_speech_tag = "<speech>" in full_response_text
+
+                if has_display_tag:
+                    current_display = extract_tag(full_response_text, "display")
+                else:
+                    current_display = full_response_text.strip()
+
+                if has_speech_tag:
+                    current_speech = extract_tag(full_response_text, "speech")
+                else:
+                    current_speech = clean_voice_text(full_response_text)
 
                 # Stream display markdown updates to client
                 if current_display and current_display != display_accumulated:
@@ -346,7 +357,7 @@ class DualStreamVoiceOrchestrator:
                     })
 
                 # Stream spoken sentences to TTS
-                if len(current_speech) > len(speech_accumulated):
+                if current_speech and len(current_speech) > len(speech_accumulated):
                     new_speech = current_speech[len(speech_accumulated):]
                     speech_accumulated = current_speech
                     speech_sentence_buffer += new_speech
@@ -362,12 +373,19 @@ class DualStreamVoiceOrchestrator:
             if speech_sentence_buffer.strip():
                 await self._speak_sentence_chunk(speech_sentence_buffer.strip())
 
-            # Fallback if model didn't use tags at all
+            # Fallback if display_accumulated was somehow empty
             if not display_accumulated and full_response_text.strip():
-                display_accumulated = full_response_text.strip()
-            if not speech_accumulated and full_response_text.strip():
-                speech_accumulated = re.sub(r'[*#`$_\\]', '', full_response_text).strip()
-                await self._speak_sentence_chunk(speech_accumulated)
+                display_accumulated, fallback_speech = extract_dual_stream_tags(full_response_text)
+                if not speech_accumulated:
+                    speech_accumulated = fallback_speech
+                    await self._speak_sentence_chunk(speech_accumulated)
+                await self._send_event({
+                    "type": "ConversationText",
+                    "role": "assistant",
+                    "content": display_accumulated,
+                    "display_markdown": display_accumulated,
+                    "speech_text": speech_accumulated,
+                })
 
             # Finalize assistant turn
             self.state = SessionState.LISTENING
