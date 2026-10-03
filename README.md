@@ -13,7 +13,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6.1-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
 [Testing and release verification](#testing--verification)
 
-The work is tracked in [the implementation plan](docs/plans/production-readiness-plan-2026-09-17.md). Historical performance figures below are design targets, not verified production measurements. Authentication and user isolation remain the final acceptance phase. See [the active runtime and execution contracts](docs/architecture/execution-contracts.md) for the current architecture.
+
 
 ---
 
