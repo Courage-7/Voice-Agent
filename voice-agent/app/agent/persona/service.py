@@ -1,4 +1,4 @@
-"""Persona management service."""
+﻿"""Persona management service."""
 
 from app.agent.persona.config import PersonaConfig
 from app.agent.prompts.personas import get_persona_prompt

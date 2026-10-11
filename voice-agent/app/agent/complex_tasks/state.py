@@ -1,4 +1,4 @@
-"""Complex task state schema for multi-step LangGraph orchestration."""
+﻿"""Complex task state schema for multi-step LangGraph orchestration."""
 
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict

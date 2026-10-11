@@ -20,20 +20,32 @@ logging.basicConfig(
 logger = logging.getLogger("voice_agent")
 
 FRONTEND_ASSETS_PATH = settings.frontend_dist_path / "assets"
+_cors_origins = list(settings.allowed_origins_list)
+_cors_origin_regex = None if _cors_origins else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup setup and graceful shutdown."""
     logger.info("Initializing Voice AI Agent...")
+    if settings.environment == "production":
+        if not (settings.frontend_dist_path / "index.html").is_file() or not FRONTEND_ASSETS_PATH.is_dir():
+            raise RuntimeError("Production frontend is missing. Build the frontend and set FRONTEND_DIST_PATH.")
+
     from app.db.session import db_gateway
     await db_gateway.connect()
+
+    # The saver owns LangGraph's schema and initializes it idempotently.  This
+    # is part of normal app startup, not a separate operator-run script.
+    from app.agent.checkpointer import langgraph_checkpointer
+    from app.agent.graph import configure_agent_graph
+    checkpointer = await langgraph_checkpointer.start()
+    if checkpointer is not None:
+        configure_agent_graph(checkpointer)
 
     if settings.demo_mode:
         logger.warning("DEMO MODE: external providers are disabled; local data is temporary.")
     if settings.environment == "production":
-        if not (settings.frontend_dist_path / "index.html").is_file() or not FRONTEND_ASSETS_PATH.is_dir():
-            raise RuntimeError("Production frontend is missing. Build the frontend and set FRONTEND_DIST_PATH.")
         from app.integrations.composio.client import composio_gateway
         from app.integrations.llm.client import groq_client
         if composio_gateway._client is None or groq_client._client is None or not db_gateway.is_connected:
@@ -43,6 +55,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Using Deepgram STT/TTS: {settings.deepgram_stt_model} / {settings.deepgram_tts_model}")
     yield
     logger.info("Shutting down Voice AI Agent...")
+    await langgraph_checkpointer.stop()
     await db_gateway.disconnect()
 
 
@@ -59,7 +72,8 @@ app = FastAPI(
 # CORS middleware for Web / UI clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

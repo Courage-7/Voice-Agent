@@ -1,4 +1,4 @@
-"""LangGraph agent state schema."""
+﻿"""LangGraph agent state schema."""
 
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict

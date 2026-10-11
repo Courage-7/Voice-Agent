@@ -1,4 +1,4 @@
-"""Dynamic verbal turn-holding and progressive task feedback engine.
+﻿"""Dynamic verbal turn-holding and progressive task feedback engine.
 
 Generates ultra-low-latency (<5ms), context-aware, organic verbal fillers
 to hold the conversational turn over TTS during asynchronous tool executions

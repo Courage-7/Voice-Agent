@@ -1,4 +1,4 @@
-"""Provider-agnostic task state machine for grounded capability execution."""
+﻿"""Provider-agnostic task state machine for grounded capability execution."""
 
 from __future__ import annotations
 

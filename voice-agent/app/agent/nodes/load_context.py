@@ -1,4 +1,4 @@
-"""Load context node: retrieves user profile and long-term memory."""
+﻿"""Load context node: retrieves user profile and long-term memory."""
 
 from typing import Any, Dict
 from app.agent.state import AgentState

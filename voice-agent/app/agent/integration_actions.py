@@ -1,4 +1,4 @@
-"""Connection-gated execution for integration requests.
+﻿"""Connection-gated execution for integration requests.
 
 Connection discovery is deliberately only a precondition here.  Every planned
 read action is bound to the user-scoped registry and executed before a response

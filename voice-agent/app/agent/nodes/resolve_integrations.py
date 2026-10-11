@@ -1,4 +1,4 @@
-"""LangGraph precondition node for connected integration work."""
+﻿"""LangGraph precondition node for connected integration work."""
 
 from typing import Any, Dict
 

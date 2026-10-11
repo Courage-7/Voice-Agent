@@ -13,7 +13,7 @@ from app.agent.state import AgentState
 logger = logging.getLogger(__name__)
 
 
-def build_agent_graph() -> Any:
+def build_agent_graph(checkpointer: Any = None) -> Any:
     """Build the authoritative multi-turn conversational LangGraph.
 
     LangGraph is a required runtime dependency.  A silent procedural fallback
@@ -55,7 +55,22 @@ def build_agent_graph() -> Any:
     builder.add_edge("respond", END)
 
     logger.info("Compiled LangGraph Agent StateGraph.")
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
-agent_graph = build_agent_graph()
+agent_graph: Any = build_agent_graph()
+
+
+def configure_agent_graph(checkpointer: Any) -> Any:
+    """Compile the authoritative graph after its durable checkpointer is ready."""
+    global agent_graph
+    agent_graph = build_agent_graph(checkpointer=checkpointer)
+    return agent_graph
+
+
+def get_agent_graph() -> Any:
+    """Return the authoritative compiled graph, initializing a fallback if not configured."""
+    global agent_graph
+    if agent_graph is None:
+        agent_graph = build_agent_graph()
+    return agent_graph

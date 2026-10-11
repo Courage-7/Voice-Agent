@@ -1,4 +1,4 @@
-"""Complex Task Execution Engine with pause/resume and safety confirmation."""
+﻿"""Complex Task Execution Engine with pause/resume and safety confirmation."""
 
 import logging
 from typing import Any, Dict, Optional
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 from datetime import datetime, timezone
+from app.core.config import settings
 from app.db.session import db_gateway
 
 
@@ -34,11 +35,14 @@ class ComplexTaskEngine:
             for tid in terminal[: len(self._active_tasks) - self._max_tasks]:
                 self._active_tasks.pop(tid, None)
 
+    @staticmethod
+    def _require_persistence() -> None:
+        if settings.requires_persistent_storage and not db_gateway.is_connected:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use in-memory task state.")
+
     async def _save_checkpoint(self, state: ComplexTaskState) -> None:
         """Persist task checkpoint to Neon PostgreSQL if connected."""
         task_id = state["task_id"]
-        self._active_tasks[task_id] = state
-        self._prune_tasks_if_needed()
 
         if db_gateway.is_connected:
             try:
@@ -76,6 +80,13 @@ class ComplexTaskEngine:
                 )
             except Exception as e:
                 logger.warning(f"Failed to persist task checkpoint for {task_id} to Neon PostgreSQL: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent task checkpoint write failed.") from e
+        else:
+            self._require_persistence()
+
+        self._active_tasks[task_id] = state
+        self._prune_tasks_if_needed()
 
     def get_task(self, task_id: str) -> Optional[ComplexTaskState]:
         """Retrieve task state by task ID."""
@@ -83,10 +94,6 @@ class ComplexTaskEngine:
 
     async def get_task_async(self, task_id: str, user_id: Optional[str] = None) -> Optional[ComplexTaskState]:
         """Retrieve task state by task ID, hydrating from Neon PostgreSQL on fresh process or cache miss."""
-        state = self.get_task(task_id)
-        if state and (user_id is None or state["user_id"] == user_id):
-            return state
-
         if db_gateway.is_connected:
             try:
                 if not user_id:
@@ -116,6 +123,13 @@ class ComplexTaskEngine:
                     return hydrated_state
             except Exception as e:
                 logger.warning(f"Failed to hydrate task {task_id} from Neon PostgreSQL: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent task lookup failed.") from e
+
+        self._require_persistence()
+        state = self.get_task(task_id)
+        if state and (user_id is None or state["user_id"] == user_id):
+            return state
 
         return None
 
@@ -175,7 +189,14 @@ class ComplexTaskEngine:
             # Mark current step as confirmed and resume
             curr_idx = state["current_step_index"]
             if curr_idx < len(state["steps"]):
-                state["steps"][curr_idx]["arguments"]["confirmed"] = True
+                step = state["steps"][curr_idx]
+                # Keep this marker for task-state readability and existing
+                # planner contracts, but authorize execution only with the
+                # immutable pending-action ID returned by the registry.
+                step["arguments"]["confirmed"] = True
+                action_id = (step.get("result") or {}).get("action_id")
+                if action_id:
+                    step["confirmation_action_id"] = action_id
             state["status"] = "executing"
             state["confirmation_proposal"] = None
 
@@ -212,6 +233,7 @@ class ComplexTaskEngine:
                 arguments=resolved_args,
                 user_id=state["user_id"],
                 session_id=state["session_id"],
+                action_id=step.get("confirmation_action_id"),
             )
 
             step["result"] = tool_res
@@ -242,6 +264,7 @@ class ComplexTaskEngine:
 
             # Success
             step["status"] = "completed"
+            step.pop("confirmation_action_id", None)
             state["collected_results"][f"step_{idx + 1}_{step['tool_name']}"] = tool_res
             state["current_step_index"] += 1
             await self._save_checkpoint(state)

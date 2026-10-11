@@ -1,4 +1,4 @@
-"""Voice AI Agent System Prompts & Companion Conversational Behavior Rules.
+﻿"""Voice AI Agent System Prompts & Companion Conversational Behavior Rules.
 
 Enforces real-time voice-first conversational constraints:
 - Plain text only (zero markdown, bullet points, asterisks, emojis, code blocks)

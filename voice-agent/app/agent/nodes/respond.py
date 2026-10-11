@@ -1,4 +1,4 @@
-"""Respond node: finalizes voice output, preserving markdown for display and cleaning speech for TTS."""
+﻿"""Respond node: finalizes voice output, preserving markdown for display and cleaning speech for TTS."""
 
 from typing import Any, Dict
 from app.agent.state import AgentState

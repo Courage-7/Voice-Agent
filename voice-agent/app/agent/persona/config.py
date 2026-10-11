@@ -1,4 +1,4 @@
-"""Persona configuration schema."""
+﻿"""Persona configuration schema."""
 
 from pydantic import BaseModel, Field
 
