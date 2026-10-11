@@ -375,9 +375,8 @@ All settings are managed via [`app/core/config.py`](voice-agent/app/core/config.
 | `SERVER_PORT` | `integer`| `8000` | Port for HTTP & WebSocket listeners |
 | `LOG_LEVEL` | `string` | `INFO` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `DEEPGRAM_API_KEY` | `string` | `""` | Deepgram platform API key |
-| `DEEPGRAM_AGENT_WS_URL` | `string` | `wss://agent.deepgram.com/v1/agent/converse` | Deepgram Voice Agent WebSocket gateway |
-| `DEEPGRAM_STT_MODEL` | `string` | `nova-2` | Deepgram live STT model (`nova-2`, `flux-general-en`) |
-| `DEEPGRAM_TTS_MODEL` | `string` | `aura-2-thalia-en` | Default voice model identifier |
+| `DEEPGRAM_STT_MODEL` | `string` | `nova-3` | Deepgram live STT model (`nova-3`, `flux-general-en`) |
+| `DEEPGRAM_TTS_MODEL` | `string` | `aura-2-thalia-en` | Default voice model identifier (Aura-2 series) |
 | `INPUT_SAMPLE_RATE` | `integer`| `16000` | Input audio sample rate in Hz |
 | `OUTPUT_SAMPLE_RATE` | `integer`| `24000` | Synthesized output audio sample rate in Hz |
 | `DEEPGRAM_EOT_THRESHOLD` | `float` | `0.75` | End-of-turn speech probability threshold (0.0 – 1.0) |
