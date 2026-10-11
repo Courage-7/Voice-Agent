@@ -24,7 +24,6 @@ import sys
 from unittest.mock import AsyncMock, patch
 
 os.environ["ENVIRONMENT"] = "testing"
-os.environ["VOICE_PIPELINE_MODE"] = "deepgram_agent"
 for name in ("DEEPGRAM_API_KEY", "GROQ_API_KEY", "COMPOSIO_API_KEY", "DATABASE_URL", "NEON_DATABASE_URL"):
     os.environ[name] = ""
 if len(sys.argv) > 1:
@@ -38,7 +37,7 @@ else:
 import app
 from app.auth.clerk import create_test_token
 from app.core.config import settings
-from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
+from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 from app.main import app as application
 from starlette.testclient import TestClient
 
@@ -54,9 +53,9 @@ assert not (app_path.parent / "graphify-out").exists()
 for directory in (app_path.parent, settings.frontend_dist_path):
     assert not any(p.name.startswith(".env") for p in directory.rglob("*")), "Environment file in release artifact"
 
-with patch.object(DeepgramVoiceAgentSession, "connect", new=AsyncMock(return_value=True)), \
-     patch.object(DeepgramVoiceAgentSession, "close", new=AsyncMock()) as close, \
-     patch.object(DeepgramVoiceAgentSession, "send_audio", new=AsyncMock()) as audio, \
+with patch.object(DualStreamVoiceOrchestrator, "connect", new=AsyncMock(return_value=True)), \
+     patch.object(DualStreamVoiceOrchestrator, "close", new=AsyncMock()) as close, \
+     patch.object(DualStreamVoiceOrchestrator, "send_audio", new=AsyncMock()) as audio, \
      TestClient(application) as client:
     health = client.get("/api/health")
     assert health.status_code == 200

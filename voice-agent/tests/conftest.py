@@ -107,7 +107,6 @@ def fake_composio(monkeypatch):
 
 @pytest.fixture
 def fake_voice_provider(monkeypatch):
-    from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
     from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 
     methods = {
@@ -115,7 +114,6 @@ def fake_voice_provider(monkeypatch):
         "send_audio": AsyncMock(), "inject_user_message": AsyncMock(),
     }
     for name, method in methods.items():
-        monkeypatch.setattr(DeepgramVoiceAgentSession, name, method)
         monkeypatch.setattr(DualStreamVoiceOrchestrator, name, method)
     return SimpleNamespace(**methods)
 

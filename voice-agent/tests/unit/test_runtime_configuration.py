@@ -47,9 +47,11 @@ def test_production_requires_clerk_verification_key():
         Settings(
             _env_file=None, environment="production",
             deepgram_api_key="test", groq_api_key="test", composio_api_key="test",
-            database_url="postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
-            clerk_issuer="https://example.clerk.accounts.dev",
-        )
+        database_url="postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
+        clerk_issuer="https://example.clerk.accounts.dev",
+        allowed_origins="https://app.example.com",
+        clerk_authorized_parties="https://app.example.com",
+    )
 
 
 def test_production_accepts_complete_configuration():
@@ -59,9 +61,39 @@ def test_production_accepts_complete_configuration():
         database_url="postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
         clerk_issuer="https://example.clerk.accounts.dev",
         clerk_jwks_url="https://example.clerk.accounts.dev/.well-known/jwks.json",
+        allowed_origins="https://app.example.com",
+        clerk_authorized_parties="https://app.example.com",
     )
     assert config.environment == "production"
     assert not config.demo_mode
+
+
+def test_production_requires_matching_https_browser_origins():
+    base = {
+        "_env_file": None,
+        "environment": "production",
+        "deepgram_api_key": "test",
+        "groq_api_key": "test",
+        "composio_api_key": "test",
+        "database_url": "postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
+        "clerk_issuer": "https://example.clerk.accounts.dev",
+        "clerk_jwks_url": "https://example.clerk.accounts.dev/.well-known/jwks.json",
+    }
+    with pytest.raises(ValidationError, match="ALLOWED_ORIGINS"):
+        Settings(**base)
+    with pytest.raises(ValidationError, match="HTTPS"):
+        Settings(**base, allowed_origins="http://app.example.com", clerk_authorized_parties="http://app.example.com")
+    with pytest.raises(ValidationError, match="overlap"):
+        Settings(**base, allowed_origins="https://app.example.com", clerk_authorized_parties="https://other.example.com")
+
+
+def test_websocket_origin_policy_uses_explicit_origins(monkeypatch):
+    from app.core.dependencies import is_allowed_origin
+
+    monkeypatch.setattr(settings, "allowed_origins", "https://app.example.com")
+    assert is_allowed_origin("https://app.example.com")
+    assert is_allowed_origin("https://app.example.com/")
+    assert not is_allowed_origin("https://attacker.example.com")
 
 
 def test_decoupled_pipeline_is_the_safe_default():

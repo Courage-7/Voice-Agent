@@ -20,7 +20,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.config import settings
-from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
 from app.integrations.deepgram.stt_client import DeepgramLiveSTTClient
 from app.integrations.deepgram.tts_client import DeepgramStreamingTTSClient
 from app.realtime.orchestrator import DualStreamVoiceOrchestrator
@@ -35,7 +34,7 @@ from app.realtime.state import SessionState
 async def test_stt_client_connection_and_audio_send():
     """Verify STT client initializes WebSocket with correct parameters and sends PCM bytes."""
     mock_ws = AsyncMock()
-    client = DeepgramLiveSTTClient(session_id="test_stt_1", model="nova-2")
+    client = DeepgramLiveSTTClient(session_id="test_stt_1", model="nova-3")
     client.ws = mock_ws
     client._is_running = True
 
@@ -155,6 +154,9 @@ async def test_dual_stream_tag_extraction():
     assert "##" not in spoken_sentence
     assert "\\frac" not in spoken_sentence
     assert "quadratic" in spoken_sentence.lower()
+    all_spoken_text = " ".join(call.args[0] for call in mock_tts.call_args_list)
+    assert "Quadratic Formula" not in all_spoken_text
+    assert "\\frac" not in all_spoken_text
 
 
 # --------------------------------------------------------------------------
@@ -278,19 +280,77 @@ async def test_orchestrator_session_cleanup_and_teardown():
 
 
 @pytest.mark.asyncio
-async def test_realtime_client_session_selects_decoupled_orchestrator(monkeypatch):
-    """Verify RealtimeClientSession uses DualStreamVoiceOrchestrator when configured."""
-    monkeypatch.setattr(settings, "voice_pipeline_mode", "decoupled")
+async def test_realtime_client_session_selects_decoupled_orchestrator():
+    """Verify RealtimeClientSession uses DualStreamVoiceOrchestrator as its authoritative engine."""
     mock_ws = AsyncMock()
     session = RealtimeClientSession(session_id="test_pipeline_mode_1", client_ws=mock_ws)
 
     assert isinstance(session.backend_engine, DualStreamVoiceOrchestrator)
     assert session.deepgram_session == session.backend_engine
 
-    # Also verify deepgram_agent mode
-    monkeypatch.setattr(settings, "voice_pipeline_mode", "deepgram_agent")
-    session_dg = RealtimeClientSession(session_id="test_pipeline_mode_2", client_ws=mock_ws)
-    assert isinstance(session_dg.backend_engine, DeepgramVoiceAgentSession)
+
+@pytest.mark.asyncio
+async def test_stt_client_connect_query_parameters(monkeypatch):
+    """Verify STT client constructs query params with nova-3, endpointing, utterance_end_ms, vad_events."""
+    monkeypatch.setattr(settings, "deepgram_api_key", "test_dg_key")
+    client = DeepgramLiveSTTClient(session_id="test_stt_params")
+
+    captured_urls = []
+
+    async def mock_connect(url, **kwargs):
+        captured_urls.append(url)
+        mock_ws = AsyncMock()
+        mock_ws.__aiter__.return_value = []
+        return mock_ws
+
+    with patch("websockets.connect", side_effect=mock_connect):
+        success = await client.connect()
+        assert success is True
+        assert len(captured_urls) == 1
+        url = captured_urls[0]
+        assert "model=nova-3" in url
+        assert "endpointing=350" in url
+        assert "utterance_end_ms=1000" in url
+        assert "vad_events=true" in url
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_tts_client_stream_speech_audio_speed_parameter(monkeypatch):
+    """Verify TTS client includes speed query parameter when specified."""
+    monkeypatch.setattr(settings, "deepgram_api_key", "test_dg_key")
+    from app.integrations.deepgram.tts_client import DeepgramStreamingTTSClient
+
+    tts = DeepgramStreamingTTSClient()
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+
+    async def mock_aiter(chunk_size):
+        yield b"\x01\x02"
+
+    mock_response.aiter_bytes = mock_aiter
+
+    class MockStreamContext:
+        async def __aenter__(self):
+            return mock_response
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    captured_calls = []
+
+    def mock_stream(method, url, **kwargs):
+        captured_calls.append({"method": method, "url": url, **kwargs})
+        return MockStreamContext()
+
+    mock_http = AsyncMock()
+    mock_http.is_closed = False
+    mock_http.stream = mock_stream
+    tts._http_client = mock_http
+
+    chunks = [c async for c in tts.stream_speech_audio("Hello world", speed=1.15)]
+    assert len(chunks) == 1
+    assert "speed=1.15" in captured_calls[0]["url"]
+    await tts.close()
 
 
 # Helper async iterator

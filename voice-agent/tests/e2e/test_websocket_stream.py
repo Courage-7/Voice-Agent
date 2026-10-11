@@ -1,7 +1,9 @@
 """End-to-end WebSocket connection and stream tests."""
 
 import json
+import pytest
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from app.auth.clerk import create_test_token
 from app.main import app
 
@@ -43,6 +45,21 @@ def test_websocket_connection_lifecycle(fake_voice_provider):
     fake_voice_provider.inject_user_message.assert_awaited_once_with("Hello Voice Agent")
     fake_voice_provider.send_audio.assert_awaited_once_with(mock_audio)
     fake_voice_provider.close.assert_awaited_once()
+
+
+def test_websocket_rejects_an_unregistered_session():
+    """A signed-in user cannot turn an arbitrary ID into a voice session."""
+    client = TestClient(app)
+    token = create_test_token(user_id="test_e2e_user", email="test_e2e@shinra.internal")
+
+    with pytest.raises(WebSocketDisconnect) as error:
+        with client.websocket_connect(
+            "/api/voice/ws/not-a-created-session",
+            subprotocols=["shinra-auth", token],
+        ):
+            pass
+
+    assert error.value.code == 1008
 
 
 def test_metrics_endpoint():

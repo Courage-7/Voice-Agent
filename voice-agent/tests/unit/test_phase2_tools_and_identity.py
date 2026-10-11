@@ -103,6 +103,36 @@ async def test_dynamic_action_write_safety_boundary():
 
 
 @pytest.mark.asyncio
+async def test_dynamic_write_uses_the_registry_confirmation_ledger():
+    """Dynamic writes may run only after a user-bound pending action is consumed."""
+    args = {
+        "app_name": "gmail",
+        "intent": "send",
+        "parameters": {"recipient": "bob@example.com", "subject": "Test"},
+    }
+    with patch(
+        "app.integrations.composio.client.composio_gateway.execute_action",
+        new=AsyncMock(return_value={"success": True, "data": {"id": "mail-1"}}),
+    ) as execute_action:
+        proposed = await tool_registry.execute_tool(
+            "execute_app_action", args, user_id="user_dynamic", session_id="session_dynamic"
+        )
+        assert proposed["requires_confirmation"] is True
+        assert proposed["action_id"]
+        execute_action.assert_not_awaited()
+
+        completed = await tool_registry.execute_tool(
+            "execute_app_action",
+            args,
+            user_id="user_dynamic",
+            session_id="session_dynamic",
+            action_id=proposed["action_id"],
+        )
+        assert completed["success"] is True
+        execute_action.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_workspace_tools_pass_entity_id():
     """Verify Google Sheets, Docs, and Drive tools propagate entity_id=user_id to Composio."""
     sheets_tool = GoogleSheetsTool()

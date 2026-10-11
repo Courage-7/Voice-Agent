@@ -7,47 +7,27 @@ import pytest
 
 from app.api.v1.system import health_check, telemetry_summary
 from app.core.config import settings
-from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
 from app.observability.metrics import metrics_collector
+from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 
 
 @pytest.mark.asyncio
-async def test_deepgram_session_settings_includes_endpointing():
-    """Verify Deepgram Settings payload includes data-driven endpointing configuration."""
-    session = DeepgramVoiceAgentSession(
+async def test_orchestrator_initializes_with_configured_endpointing():
+    """Verify orchestrator STT client is initialized with configured endpointing and model."""
+    session = DualStreamVoiceOrchestrator(
         session_id="sess_endpointing_test",
         user_id="user_eot",
     )
-    mock_ws = AsyncMock()
-    session.ws = mock_ws
-    session._is_running = True
-
-    await session._send_settings_configuration()
-    assert mock_ws.send.called
-    sent_payload = json.loads(mock_ws.send.call_args[0][0])
-
-    listen_cfg = sent_payload["agent"]["listen"]["provider"]
-    assert listen_cfg["type"] == "deepgram"
-    assert listen_cfg["model"] == settings.deepgram_stt_model
+    assert session.stt_client.endpointing_ms == settings.deepgram_eot_timeout_ms
+    assert session.stt_client.model == settings.deepgram_stt_model
 
 
 @pytest.mark.asyncio
 async def test_latency_telemetry_recording_and_percentiles():
-    """Verify LatencyReport event updates metrics collector and computes percentiles."""
-    session = DeepgramVoiceAgentSession(
-        session_id="sess_latency_test",
-        user_id="user_lat",
-    )
-
-    # Ingest multiple latency reports
-    samples = [
-        {"type": "LatencyReport", "stt_latency": 150.0, "ttt_token_latency": 180.0, "tts_latency": 120.0, "total_latency": 450.0},
-        {"type": "LatencyReport", "stt_latency": 140.0, "ttt_token_latency": 190.0, "tts_latency": 130.0, "total_latency": 460.0},
-        {"type": "LatencyReport", "stt_latency": 160.0, "ttt_token_latency": 210.0, "tts_latency": 110.0, "total_latency": 480.0},
-    ]
-
-    for sample in samples:
-        await session._handle_server_event(sample)
+    """Verify latency reports update metrics collector and compute percentiles."""
+    metrics_collector.record_latency(stt=150.0, ttt_token=180.0, tts=120.0, total=450.0)
+    metrics_collector.record_latency(stt=140.0, ttt_token=190.0, tts=130.0, total=460.0)
+    metrics_collector.record_latency(stt=160.0, ttt_token=210.0, tts=110.0, total=480.0)
 
     summary = metrics_collector.get_summary()
     assert "latency" in summary

@@ -5,85 +5,58 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
 from app.observability.metrics import MetricsCollector
+from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 from app.realtime.session import RealtimeClientSession
 from app.realtime.state import SessionState
 
 
 @pytest.mark.asyncio
-async def test_native_greeting_in_settings_configuration():
-    """Verify that agent.greeting is populated natively in initial Settings payload."""
-    session = DeepgramVoiceAgentSession(session_id="test_sess_1", user_id="user_123")
-    mock_ws = AsyncMock()
-    session.ws = mock_ws
-    session._is_running = True
+async def test_native_greeting_on_orchestrator_connect():
+    """Verify that orchestrator establishes state and prepares greeting on connect."""
+    events = []
 
-    await session._send_settings_configuration()
+    async def mock_on_event(evt):
+        events.append(evt)
 
-    assert mock_ws.send.called
-    sent_payload = json.loads(mock_ws.send.call_args[0][0])
-
-    assert sent_payload["type"] == "Settings"
-    assert "agent" in sent_payload
-    assert "greeting" in sent_payload["agent"] and len(sent_payload["agent"]["greeting"]) > 0
-    assert sent_payload["agent"]["think"]["provider"]["type"] in ["groq", "open_ai"]
-    assert sent_payload["agent"]["listen"]["provider"]["type"] == "deepgram"
-    assert sent_payload["agent"]["speak"]["provider"]["type"] == "deepgram"
+    session = DualStreamVoiceOrchestrator(
+        session_id="test_sess_1",
+        user_id="user_123",
+        on_event=mock_on_event,
+    )
+    with patch.object(session.stt_client, "connect", AsyncMock(return_value=True)):
+        connected = await session.connect()
+        assert connected is True
+        assert session.state == SessionState.LISTENING
+        state_events = [e for e in events if e.get("type") == "SessionStateChange"]
+        assert len(state_events) >= 1
+        assert any(e["state"] == "listening" for e in state_events)
 
 
 @pytest.mark.asyncio
-async def test_settings_applied_does_not_send_duplicate_greeting():
-    """Verify that SettingsApplied does not send an extra InjectAgentMessage."""
-    session = DeepgramVoiceAgentSession(session_id="test_sess_2", user_id="user_123")
-    mock_ws = AsyncMock()
-    session.ws = mock_ws
-    session._is_running = True
+async def test_orchestrator_greeting_generation_variations():
+    """Verify that orchestrator produces varied, natural greeting text."""
+    session = DualStreamVoiceOrchestrator(session_id="test_sess_2", user_id="user_123")
+    greeting_alex = session._generate_greeting("Alex")
+    assert "Alex" in greeting_alex
+    assert len(greeting_alex) > 10
 
-    event = {"type": "SettingsApplied"}
-    await session._handle_server_event(event)
-
-    # Should not send any payload on websocket because native greeting handles startup
-    assert not mock_ws.send.called
+    greeting_default = session._generate_greeting()
+    assert len(greeting_default) > 10
 
 
 @pytest.mark.asyncio
 async def test_latency_report_handling_safe_parsing():
-    """Verify that LatencyReport events with partial/full fields are safely handled and forwarded."""
-    forwarded_events = []
+    """Verify that Latency metrics are safely recorded and summarized."""
+    collector = MetricsCollector()
+    collector.record_latency(stt=150.2, ttt_token=210.5, tts=95.8, total=780.0)
+    collector.record_latency(stt=140.0, ttt_token=190.0, tts=110.0, total=500.0)
 
-    async def mock_on_event(evt):
-        forwarded_events.append(evt)
-
-    session = DeepgramVoiceAgentSession(
-        session_id="test_sess_3",
-        user_id="user_123",
-        on_event=mock_on_event,
-    )
-    session.ws = AsyncMock()
-    session._is_running = True
-
-    # Full report
-    full_event = {
-        "type": "LatencyReport",
-        "stt_latency": 150.2,
-        "ttt_token_latency": 210.5,
-        "ttt_text_latency": 320.0,
-        "ttt_tool_latency": 45.0,
-        "tts_latency": 95.8,
-        "total_latency": 780.0,
-    }
-    await session._handle_server_event(full_event)
-    assert len(forwarded_events) == 1
-    assert forwarded_events[0]["total_latency"] == 780.0
-
-    # Minimal/partial report
-    partial_event = {
-        "type": "LatencyReport",
-        "total_latency": 500.0,
-    }
-    await session._handle_server_event(partial_event)
-    assert len(forwarded_events) == 2
+    summary = collector.get_summary()
+    assert "latency" in summary
+    assert summary["latency"]["total_roundtrip_ms"]["count"] == 2
+    assert summary["latency"]["total_roundtrip_ms"]["avg"] == 640.0
+    assert summary["latency"]["stt_ms"]["avg"] == 145.1
 
 
 def test_metrics_collector_session_and_turn_counters():
@@ -132,9 +105,23 @@ async def test_realtime_client_session_wires_metrics_and_events():
     assert client_session.state == SessionState.DISCONNECTED
 
 
+@pytest.mark.asyncio
+async def test_realtime_client_session_reports_provider_connection_failure():
+    """A failed provider connection must transition the client out of connected state."""
+    mock_ws = AsyncMock()
+    client_session = RealtimeClientSession(session_id="test_provider_failure", client_ws=mock_ws)
+
+    with patch.object(client_session.deepgram_session, "connect", return_value=False):
+        await client_session.start()
+
+    messages = [json.loads(call.args[0]) for call in mock_ws.send_text.await_args_list]
+    assert {"type": "SessionStateChange", "state": "error"} in messages
+    assert any(message["type"] == "Error" for message in messages)
+
+
 def test_dynamic_greeting_generation():
     """Verify dynamic greeting adapts to user's name and is warm and engaging."""
-    session = DeepgramVoiceAgentSession(session_id="test_sess_5", user_id="user_123")
+    session = DualStreamVoiceOrchestrator(session_id="test_sess_5", user_id="user_123")
     greeting_named = session._generate_greeting("Alex")
     assert "Alex" in greeting_named
     assert len(greeting_named) > 10
