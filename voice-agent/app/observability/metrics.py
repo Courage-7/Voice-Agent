@@ -36,15 +36,18 @@ class MetricsCollector:
         ttft: Optional[float] = None,
         tts: Optional[float] = None,
         total: Optional[float] = None,
+        ttt_token: Optional[float] = None,
     ) -> None:
         """Record latency data points from live telemetry reports."""
+        token_latency = ttft if ttft is not None else ttt_token
+
         if stt is not None and stt > 0:
             self.stt_latencies.append(stt)
             if len(self.stt_latencies) > 1000:
                 self.stt_latencies = self.stt_latencies[-500:]
 
-        if ttft is not None and ttft > 0:
-            self.ttft_latencies.append(ttft)
+        if token_latency is not None and token_latency > 0:
+            self.ttft_latencies.append(token_latency)
             if len(self.ttft_latencies) > 1000:
                 self.ttft_latencies = self.ttft_latencies[-500:]
 

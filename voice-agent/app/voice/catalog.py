@@ -1,5 +1,6 @@
-"""Voice Catalog and TTS Model Registry for Deepgram Flux & Aura-2 Voice Models."""
+﻿"""Voice Catalog and TTS Model Registry for Deepgram Flux & Aura-2 Voice Models."""
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
@@ -136,16 +137,77 @@ class VoiceCatalogService:
         )
         return DEFAULT_VOICE_MODEL
 
+    async def get_user_voice_async(self, user_id: str, default: Optional[str] = None) -> str:
+        """Retrieve voice preference from Neon user profile metadata, falling back to cache or default."""
+        if user_id in _USER_VOICE_PREFERENCES:
+            return _USER_VOICE_PREFERENCES[user_id]
+
+        from app.core.config import settings
+        from app.db.session import db_gateway
+
+        if db_gateway.is_connected:
+            try:
+                from app.users.repository import user_repository
+                user = await user_repository.get_by_id(user_id)
+                if user and user.metadata and "voice_model" in user.metadata:
+                    validated = self.validate_voice(user.metadata["voice_model"])
+                    _USER_VOICE_PREFERENCES[user_id] = validated
+                    return validated
+            except Exception as e:
+                logger.warning(f"Failed to fetch voice preference for user {user_id} from DB: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent voice preference lookup failed.") from e
+
+        if settings.requires_persistent_storage and not db_gateway.is_connected:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use in-memory voice preference.")
+
+        return self.validate_voice(default)
+
     def get_user_voice(self, user_id: str, default: Optional[str] = None) -> str:
         """Retrieve the persisted or active voice preference for a user."""
         if user_id in _USER_VOICE_PREFERENCES:
             return _USER_VOICE_PREFERENCES[user_id]
         return self.validate_voice(default)
 
-    def set_user_voice(self, user_id: str, voice_model: str) -> str:
-        """Save a validated voice preference for a user."""
+    async def set_user_voice_async(self, user_id: str, voice_model: str) -> str:
+        """Save a validated voice preference to Neon user profile metadata."""
         validated = self.validate_voice(voice_model)
         _USER_VOICE_PREFERENCES[user_id] = validated
+
+        from app.core.config import settings
+        from app.db.session import db_gateway
+
+        if db_gateway.is_connected:
+            try:
+                from app.users.repository import user_repository
+                user = await user_repository.get_by_id(user_id)
+                if user:
+                    user.metadata["voice_model"] = validated
+                    await user_repository.save(user)
+                else:
+                    from app.users.models import UserProfile
+                    new_user = UserProfile(id=user_id, metadata={"voice_model": validated})
+                    await user_repository.save(new_user)
+                logger.info(f"Persisted voice preference for user '{user_id}' to '{validated}' in Neon.")
+            except Exception as e:
+                logger.warning(f"Failed to persist voice preference for user {user_id} to DB: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Failed to persist voice preference to database.") from e
+        elif settings.requires_persistent_storage:
+            raise RuntimeError("Persistent storage is unavailable; refusing to store voice preference in-memory.")
+
+        return validated
+
+    def set_user_voice(self, user_id: str, voice_model: str) -> str:
+        """Save a validated voice preference for a user (sync cache + background DB persist)."""
+        validated = self.validate_voice(voice_model)
+        _USER_VOICE_PREFERENCES[user_id] = validated
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                loop.create_task(self.set_user_voice_async(user_id, validated))
+        except RuntimeError:
+            pass
         logger.info(f"Updated voice preference for user '{user_id}' to '{validated}'.")
         return validated
 

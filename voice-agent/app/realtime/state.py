@@ -1,4 +1,4 @@
-"""Real-time voice session state enumeration."""
+﻿"""Real-time voice session state enumeration."""
 
 from enum import Enum
 

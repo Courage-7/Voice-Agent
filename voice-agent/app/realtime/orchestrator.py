@@ -13,10 +13,7 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 from app.agent.persona.service import persona_service
 from app.agent.verbal_feedback import get_contextual_verbal_filler
-from app.agent.integration_actions import (
-    execute_requested_integration_actions,
-    format_integration_response,
-)
+from app.agent.integration_actions import format_integration_response
 from app.conversations.service import conversation_service
 from app.core.config import settings
 from app.integrations.deepgram.stt_client import DeepgramLiveSTTClient
@@ -130,10 +127,12 @@ class DualStreamVoiceOrchestrator:
 
         if isinstance(mem_res, str):
             self._memory_summary = mem_res
-        if profile_res and not isinstance(profile_res, Exception) and profile_res.full_name:
-            if profile_res.full_name not in ("User", "default_user"):
+        if profile_res and not isinstance(profile_res, Exception):
+            if profile_res.full_name and profile_res.full_name not in ("User", "default_user"):
                 self._user_name = profile_res.full_name.strip().split()[0]
                 self._user_context_str = f"User Name: {profile_res.full_name}\nUser ID: {self.user_id}"
+            if profile_res.metadata and "voice_model" in profile_res.metadata:
+                self.voice_model = voice_catalog_service.validate_voice(profile_res.metadata["voice_model"])
 
     def _generate_greeting(self, user_name: Optional[str] = None) -> str:
         """Generate a warm, casual, randomized greeting from a curated pool."""
@@ -259,7 +258,7 @@ class DualStreamVoiceOrchestrator:
         self._active_turn_task = asyncio.create_task(self._process_turn_pipeline(user_text))
 
     async def _process_turn_pipeline(self, user_text: str) -> None:
-        """Execute the complete LLM reasoning, dual-stream generation, tool execution, and TTS loop."""
+        """Execute the complete LangGraph reasoning, tool execution, dual-stream, and TTS loop."""
         try:
             self.state = SessionState.THINKING
             await self._send_event({"type": "SessionStateChange", "state": self.state.value})
@@ -280,59 +279,6 @@ class DualStreamVoiceOrchestrator:
                 # 2. Concurrently stream spoken verbal filler over the TTS hot-path
                 filler_task = asyncio.create_task(self._speak_sentence_chunk(filler))
 
-            # A connection lookup is only a precondition.  For a supported
-            # integration request, execute every planned read action here before
-            # generating a response so the model cannot stop after merely
-            # reporting connected apps.
-            integration_execution = await execute_requested_integration_actions(
-                user_text=user_text,
-                user_id=self.user_id,
-                session_id=self.session_id,
-                on_activity=self._send_event,
-            )
-            if integration_execution is not None:
-                if filler_task and not filler_task.done():
-                    await filler_task
-                await self._deliver_completed_integration_turn(
-                    format_integration_response(integration_execution, filler_spoken=bool(filler))
-                )
-                return
-
-            if filler_task and not filler_task.done():
-                await filler_task
-
-            # Build system instructions
-            instructions = persona_service.get_voice_instructions(
-                user_context=self._user_context_str,
-                memory_context=self._memory_summary,
-            )
-
-            # Fetch recent conversation messages
-            session_obj = conversation_service.get_session(self.session_id)
-            recent_msgs = []
-            if session_obj and session_obj.messages:
-                for m in session_obj.messages[-6:]:
-                    recent_msgs.append({"role": m.role, "content": m.content})
-            else:
-                recent_msgs.append({"role": "user", "content": user_text})
-
-            dual_prompt = (
-                f"{instructions}\n\n"
-                "### DUAL-STREAM VOICE & DISPLAY PROTOCOL\n"
-                "Format your complete response using exactly two tagged blocks:\n"
-                "<display>\n"
-                "Rich GitHub-flavored markdown for on-screen rendering. Use clear headings (##), bold text, bullet points, "
-                "tables, fenced code blocks with language tags, and KaTeX math formulas ($...$ for inline, $$...$$ for display equations).\n"
-                "</display>\n"
-                "<speech>\n"
-                "Plain, natural, conversational spoken English. Speak only words a human would pronounce aloud. "
-                "NEVER include asterisks, hash tags, backticks, LaTeX symbols, code, URLs, or markdown syntax here. "
-                "Explain the intuition of mathematical formulas or code naturally without reading raw syntax.\n"
-                "</speech>\n"
-            )
-
-            messages = [{"role": "system", "content": dual_prompt}] + recent_msgs
-
             def extract_tag(text: str, tag: str) -> str:
                 start_tag = f"<{tag}>"
                 end_tag = f"</{tag}>"
@@ -344,13 +290,14 @@ class DualStreamVoiceOrchestrator:
                     return text[start_idx:end_idx]
                 return text[start_idx:]
 
-            # Stream LLM tokens from Groq
+            # Token streaming state accumulators
             full_response_text = ""
             display_accumulated = ""
             speech_accumulated = ""
             speech_sentence_buffer = ""
 
-            async for delta in groq_client.stream_chat_completion(messages=messages):
+            async def handle_token(delta: str) -> None:
+                nonlocal full_response_text, display_accumulated, speech_accumulated, speech_sentence_buffer
                 full_response_text += delta
 
                 has_display_tag = "<display>" in full_response_text
@@ -361,10 +308,7 @@ class DualStreamVoiceOrchestrator:
                 else:
                     current_display = full_response_text.strip()
 
-                if has_speech_tag:
-                    current_speech = extract_tag(full_response_text, "speech")
-                else:
-                    current_speech = clean_voice_text(full_response_text)
+                current_speech = extract_tag(full_response_text, "speech") if has_speech_tag else ""
 
                 # Stream display markdown updates to client
                 if current_display and current_display != display_accumulated:
@@ -390,15 +334,71 @@ class DualStreamVoiceOrchestrator:
                                 await self._speak_sentence_chunk(sentence.strip())
                         speech_sentence_buffer = parts[-1]
 
+            # Fetch recent conversation messages
+            session_obj = conversation_service.get_session(self.session_id)
+            recent_msgs = []
+            if session_obj and session_obj.messages:
+                for m in session_obj.messages[-6:]:
+                    recent_msgs.append({"role": m.role, "content": m.content})
+            else:
+                recent_msgs.append({"role": "user", "content": user_text})
+
+            # Execute the authoritative LangGraph state graph
+            from app.agent.graph import get_agent_graph
+            graph = get_agent_graph()
+
+            initial_state = {
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "messages": recent_msgs,
+                "memory_context": self._memory_summary,
+                "user_context": self._user_context_str,
+                "active_tool_call": None,
+                "tool_result": None,
+                "response_text": "",
+                "error": None,
+                "integration_handled": False,
+            }
+            config = {
+                "configurable": {
+                    "thread_id": self.session_id,
+                    "on_token": handle_token,
+                    "on_activity": self._send_event,
+                }
+            }
+
+            final_state = await graph.ainvoke(initial_state, config=config)
+
+            if filler_task and not filler_task.done():
+                await filler_task
+
+            # If an integration action was completed by the graph, deliver its structured result
+            if final_state.get("integration_handled"):
+                integration_resp = final_state.get("response_text", "")
+                await self._deliver_completed_integration_turn(integration_resp)
+                return
+
+            # Safe fallback if the model omitted speech tags during streaming
+            if not speech_accumulated and (full_response_text.strip() or final_state.get("response_text")):
+                raw = full_response_text.strip() or final_state.get("response_text", "")
+                _, fallback_speech = extract_dual_stream_tags(raw)
+                if fallback_speech:
+                    speech_accumulated = fallback_speech
+                    speech_sentence_buffer = fallback_speech
+
             # Flush remaining speech buffer
             if speech_sentence_buffer.strip():
                 await self._speak_sentence_chunk(speech_sentence_buffer.strip())
 
-            # Fallback if display_accumulated was somehow empty
-            if not display_accumulated and full_response_text.strip():
-                display_accumulated, fallback_speech = extract_dual_stream_tags(full_response_text)
+            # Fallback if display_accumulated was empty
+            if not display_accumulated:
+                display_accumulated = (
+                    final_state.get("display_markdown")
+                    or final_state.get("response_text")
+                    or full_response_text.strip()
+                )
                 if not speech_accumulated:
-                    speech_accumulated = fallback_speech
+                    speech_accumulated = final_state.get("speech_text") or display_accumulated
                     await self._speak_sentence_chunk(speech_accumulated)
                 await self._send_event({
                     "type": "ConversationText",
@@ -426,6 +426,7 @@ class DualStreamVoiceOrchestrator:
                     "speech_text": speech_accumulated,
                 },
             )
+
 
         except asyncio.CancelledError:
             logger.info(f"[{self.session_id}] Assistant turn generation cancelled by user barge-in.")
@@ -496,7 +497,7 @@ class DualStreamVoiceOrchestrator:
         """Update TTS voice model dynamically mid-session."""
         validated = voice_catalog_service.validate_voice(voice_model)
         self.voice_model = validated
-        voice_catalog_service.set_user_voice(self.user_id, validated)
+        await voice_catalog_service.set_user_voice_async(self.user_id, validated)
         await self._send_event({
             "type": "SpeakUpdated",
             "voice": validated,

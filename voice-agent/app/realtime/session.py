@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional
 
 from fastapi import WebSocket
 from app.core.config import settings
-from app.integrations.deepgram.agent_session import DeepgramVoiceAgentSession
 from app.observability.metrics import metrics_collector
 from app.realtime.orchestrator import DualStreamVoiceOrchestrator
 from app.realtime.state import SessionState
@@ -29,23 +28,14 @@ class RealtimeClientSession:
         self.voice_model = voice_model
         self.state = SessionState.CONNECTING
 
-        # Select pipeline mode: decoupled dual-stream or monolithic deepgram_agent
-        if getattr(settings, "voice_pipeline_mode", "decoupled") == "decoupled":
-            self.backend_engine = DualStreamVoiceOrchestrator(
-                session_id=session_id,
-                user_id=user_id,
-                voice_model=voice_model,
-                on_audio_chunk=self._forward_audio_to_client,
-                on_event=self._forward_event_to_client,
-            )
-        else:
-            self.backend_engine = DeepgramVoiceAgentSession(
-                session_id=session_id,
-                user_id=user_id,
-                voice_model=voice_model,
-                on_audio_chunk=self._forward_audio_to_client,
-                on_event=self._forward_event_to_client,
-            )
+        # Authoritative voice runtime: decoupled dual-stream orchestrator
+        self.backend_engine = DualStreamVoiceOrchestrator(
+            session_id=session_id,
+            user_id=user_id,
+            voice_model=voice_model,
+            on_audio_chunk=self._forward_audio_to_client,
+            on_event=self._forward_event_to_client,
+        )
         # Backward compatibility alias
         self.deepgram_session = self.backend_engine
 
@@ -62,6 +52,7 @@ class RealtimeClientSession:
             await self._send_state_update()
         else:
             self.state = SessionState.ERROR
+            await self._send_state_update()
             await self._send_json_message({
                 "type": "Error",
                 "message": "Deepgram Voice Agent could not be connected. Check DEEPGRAM_API_KEY.",

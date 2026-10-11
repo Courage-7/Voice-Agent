@@ -1,4 +1,4 @@
-"""Frontend and Playground UI serving router."""
+﻿"""Frontend and Playground UI serving router."""
 
 from pathlib import Path
 from fastapi import APIRouter

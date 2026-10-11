@@ -559,6 +559,12 @@ export function useVoiceAgent() {
         playbackSuppressedRef.current = false;
         setActiveTool(null);
         break;
+      case 'Error':
+        toast.error('Voice Session Unavailable', {
+          description: msg.message || 'The voice provider could not establish a session.',
+        });
+        stopSession();
+        break;
       case 'LatencyReport': {
         const rawLat = msg.latency_ms ?? (msg.total_latency
           ? (msg.total_latency < 10 ? msg.total_latency * 1000 : msg.total_latency)
