@@ -40,6 +40,7 @@ class DeepgramStreamingTTSClient:
         self,
         text: str,
         voice_model: Optional[str] = None,
+        speed: Optional[float] = None,
     ) -> AsyncIterator[bytes]:
         """Stream raw linear16 24kHz PCM chunks for a given text phrase."""
         clean_text = text.strip()
@@ -60,6 +61,9 @@ class DeepgramStreamingTTSClient:
             "sample_rate": str(self.sample_rate),
             "container": "none",
         }
+        if speed is not None:
+            params["speed"] = str(round(float(speed), 2))
+
         url = f"https://api.deepgram.com/v1/speak?{urlencode(params)}"
         headers = {
             "Authorization": f"Token {settings.deepgram_api_key}",
@@ -91,11 +95,12 @@ class DeepgramStreamingTTSClient:
         self,
         text: str,
         voice_model: Optional[str] = None,
+        speed: Optional[float] = None,
     ) -> bytes:
         """Synthesize entire phrase to a single PCM byte string."""
         buffer = bytearray()
         try:
-            async for chunk in self.stream_speech_audio(text, voice_model=voice_model):
+            async for chunk in self.stream_speech_audio(text, voice_model=voice_model, speed=speed):
                 buffer.extend(chunk)
             return bytes(buffer)
         except Exception:

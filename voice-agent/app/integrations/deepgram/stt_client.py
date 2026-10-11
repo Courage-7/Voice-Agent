@@ -1,7 +1,7 @@
 """Deepgram Live Streaming STT (Speech-to-Text) WebSocket Client.
 
-Provides full-duplex live transcription using Deepgram Nova-2 with real-time
-interim results, endpointing, and instant speech detection for barge-in.
+Provides full-duplex live transcription using Deepgram Nova-3 with real-time
+interim results, endpointing, utterance_end detection, and instant speech detection for barge-in.
 """
 
 import asyncio
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeepgramLiveSTTClient:
-    """Manages real-time streaming audio transcription via Deepgram Nova-2 WebSocket."""
+    """Manages real-time streaming audio transcription via Deepgram Nova-3 WebSocket."""
 
     def __init__(
         self,
@@ -25,15 +25,17 @@ class DeepgramLiveSTTClient:
         model: Optional[str] = None,
         sample_rate: int = 16000,
         endpointing_ms: int = 350,
+        utterance_end_ms: int = 1000,
         on_transcript: Optional[Callable[[str, bool, bool], Coroutine[Any, Any, None]]] = None,
         on_speech_started: Optional[Callable[[], Coroutine[Any, Any, None]]] = None,
         on_utterance_end: Optional[Callable[[], Coroutine[Any, Any, None]]] = None,
         on_error: Optional[Callable[[str], Coroutine[Any, Any, None]]] = None,
     ) -> None:
         self.session_id = session_id
-        self.model = model or settings.deepgram_stt_model or "nova-2"
+        self.model = model or settings.deepgram_stt_model or "nova-3"
         self.sample_rate = sample_rate
         self.endpointing_ms = endpointing_ms
+        self.utterance_end_ms = utterance_end_ms
 
         self.on_transcript = on_transcript
         self.on_speech_started = on_speech_started
@@ -58,6 +60,7 @@ class DeepgramLiveSTTClient:
             "smart_format": "true",
             "interim_results": "true",
             "endpointing": str(self.endpointing_ms),
+            "utterance_end_ms": str(self.utterance_end_ms),
             "vad_events": "true",
         }
         url = f"wss://api.deepgram.com/v1/listen?{urlencode(params)}"
