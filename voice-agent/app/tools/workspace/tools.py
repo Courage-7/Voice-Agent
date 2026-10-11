@@ -1,4 +1,4 @@
-"""Google Workspace tools: Google Sheets, Docs, and Drive via Composio."""
+﻿"""Google Workspace tools: Google Sheets, Docs, and Drive via Composio."""
 
 from typing import Any, Dict, List, Optional
 from app.integrations.composio.client import composio_gateway

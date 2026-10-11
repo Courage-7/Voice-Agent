@@ -1,4 +1,4 @@
-"""Base tool contract, metadata definitions, and policy abstractions."""
+﻿"""Base tool contract, metadata definitions, and policy abstractions."""
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterable, Tuple
@@ -50,6 +50,15 @@ class BaseTool(ABC):
             return True
         connected = {str(app).upper() for app in connected_apps}
         return bool(connected.intersection(self.supported_connected_apps))
+
+    def requires_confirmation_for(self, arguments: Dict[str, Any]) -> bool:
+        """Return whether this specific invocation is a state-changing action.
+
+        Most tools have a static policy. Dynamic adapters can override this
+        method after resolving their requested operation so the registry still
+        owns the pending-action ledger and replay protection.
+        """
+        return self.requires_confirmation
 
     def to_deepgram_function_schema(self) -> Dict[str, Any]:
         """Convert a server-executed tool to a Deepgram function contract."""

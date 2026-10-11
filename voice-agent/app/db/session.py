@@ -1,4 +1,4 @@
-"""Neon Serverless PostgreSQL connection pool and query gateway."""
+﻿"""Neon Serverless PostgreSQL connection pool and query gateway."""
 
 from contextlib import asynccontextmanager
 import json

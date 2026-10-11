@@ -1,4 +1,4 @@
-"""Speech Payload Distiller & Token Budgeting Gateway.
+﻿"""Speech Payload Distiller & Token Budgeting Gateway.
 
 Prevents LLM token exhaustion by sanitizing, pruning, and strictly budgeting
 tool output payloads before they are serialized into WebSocket FunctionCallResponse

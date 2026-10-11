@@ -1,4 +1,4 @@
-"""System tool to gracefully end a voice conversation session."""
+﻿"""System tool to gracefully end a voice conversation session."""
 
 import logging
 from typing import Any, Dict

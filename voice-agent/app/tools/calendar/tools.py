@@ -1,4 +1,4 @@
-"""Calendar tools: Google Calendar and Outlook Calendar integrations via Composio."""
+﻿"""Calendar tools: Google Calendar and Outlook Calendar integrations via Composio."""
 
 from typing import Any, Dict, List, Optional
 from app.integrations.composio.client import composio_gateway

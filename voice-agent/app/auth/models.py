@@ -1,4 +1,4 @@
-"""Provider-verified identity models used by protected application routes."""
+﻿"""Provider-verified identity models used by protected application routes."""
 
 from typing import Optional
 from pydantic import BaseModel

@@ -1,11 +1,11 @@
-"""Execution Ledger for recording and verifying executed tool actions.
+﻿"""Execution Ledger for recording and verifying executed tool actions.
 
 Provides durable receipts, deduplication, and replay prevention for state-modifying actions.
 """
 
 import asyncio
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import logging
@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from app.db.session import db_gateway
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,11 @@ class ExecutionLedger:
         for k in sorted_keys[:excess]:
             self._receipts.pop(k, None)
 
+    @staticmethod
+    def _require_persistence() -> None:
+        if settings.requires_persistent_storage and not db_gateway.is_connected:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use in-memory execution receipts.")
+
     async def record_execution(
         self,
         tool_name: str,
@@ -83,9 +89,6 @@ class ExecutionLedger:
             result_summary=result_summary,
             created_at=time.time(),
         )
-        self._receipts[receipt_id] = receipt
-        self._prune_if_needed()
-
         if db_gateway.is_connected:
             try:
                 query = """
@@ -109,13 +112,20 @@ class ExecutionLedger:
                 )
             except Exception as e:
                 logger.warning(f"Failed to persist execution receipt {receipt_id} to Neon PostgreSQL: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent execution receipt write failed.") from e
+        else:
+            self._require_persistence()
+
+        self._receipts[receipt_id] = receipt
+        self._prune_if_needed()
 
         logger.info(
             f"Recorded execution receipt {receipt_id}: tool={tool_name} user={user_id} status={status}"
         )
         return receipt
 
-    def find_recent_execution(
+    async def find_recent_execution(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
@@ -128,6 +138,35 @@ class ExecutionLedger:
         except Exception:
             serialized = str(sorted(arguments.items()))
         arg_hash = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+        if db_gateway.is_connected:
+            row = await db_gateway.fetchrow_as_user(
+                user_id,
+                """
+                SELECT * FROM execution_receipts
+                WHERE tool_name = $1 AND user_id = $2 AND arguments_hash = $3
+                  AND status = 'success' AND created_at >= $4
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                tool_name,
+                user_id,
+                arg_hash,
+                datetime.now(timezone.utc) - timedelta(seconds=window_seconds),
+            )
+            if row:
+                data = dict(row)
+                receipt = ExecutionReceipt(
+                    receipt_id=data["id"], tool_name=data["tool_name"], user_id=data["user_id"],
+                    session_id=data.get("session_id") or "", arguments_hash=data["arguments_hash"],
+                    status=data["status"], action_id=data.get("action_id"),
+                    result_summary=data.get("result_summary") or "",
+                    created_at=data["created_at"].timestamp(),
+                )
+                self._receipts[receipt.receipt_id] = receipt
+                self._prune_if_needed()
+                return receipt
+        else:
+            self._require_persistence()
 
         cutoff = time.time() - window_seconds
         for r in reversed(list(self._receipts.values())):

@@ -1,4 +1,4 @@
-"""Dynamic Intent-Driven App Action Tool.
+﻿"""Dynamic Intent-Driven App Action Tool.
 
 Dynamically maps and routes user intent to any available action across all connected apps
 in the user's workspace (Gmail, Google Calendar, Sheets, Docs, Drive, Outlook, Search, etc.).
@@ -123,6 +123,17 @@ class ExecuteAppActionTool(BaseTool):
         "required": ["app_name", "intent"],
     }
 
+    def requires_confirmation_for(self, arguments: Dict[str, Any]) -> bool:
+        """Apply the registry's durable confirmation policy to resolved writes."""
+        app_name = str(arguments.get("app_name") or "")
+        intent = str(arguments.get("intent") or "")
+        slug_upper = self._resolve_slug(app_name, intent).upper()
+        intent_words = set(intent.lower().replace("_", " ").split())
+        return (
+            any(kw in slug_upper for kw in ("SEND", "CREATE", "APPEND", "UPDATE", "DELETE", "INSERT", "BOOK", "DISPATCH"))
+            or bool(intent_words.intersection(WRITE_INTENTS))
+        )
+
     def _resolve_slug(self, app_name: str, intent: str) -> str:
         """Resolve app and intent to a Composio action slug."""
         app_clean = app_name.lower().replace("_", "").replace(" ", "")
@@ -184,12 +195,7 @@ class ExecuteAppActionTool(BaseTool):
         params = parameters or {}
 
         # Enforce execution boundary safety on the resolved action slug and full intent
-        slug_upper = slug.upper()
-        intent_words = set(intent.lower().replace("_", " ").split()) if intent else set()
-        is_write = (
-            any(kw in slug_upper for kw in ("SEND", "CREATE", "APPEND", "UPDATE", "DELETE", "INSERT", "BOOK", "DISPATCH"))
-            or bool(intent_words.intersection(WRITE_INTENTS))
-        )
+        is_write = self.requires_confirmation_for({"app_name": app_name, "intent": intent})
 
         if is_write and not confirmed:
             logger.info(f"Dynamic App Action resolved write action '{slug}' (intent='{intent}') requires verbal confirmation.")

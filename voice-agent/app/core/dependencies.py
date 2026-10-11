@@ -1,4 +1,4 @@
-"""FastAPI Dependency injection helpers and authentication guards."""
+﻿"""FastAPI Dependency injection helpers and authentication guards."""
 
 import logging
 from typing import Optional
@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from fastapi import Header, HTTPException, WebSocket, WebSocketException, status
 from app.auth.models import AuthUser
 from app.auth.clerk import clerk_verifier
-from app.core.config import Settings, settings
+from app.core.config import Settings, normalize_origin, settings
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +62,22 @@ def get_optional_user(
 
 
 def is_allowed_origin(origin_header: Optional[str]) -> bool:
-    """Validate WebSocket origin against allowed local and production hosts (Finding F01/F07)."""
+    """Validate WebSocket origin against explicit browser origin policy."""
     if not origin_header:
         # Direct non-browser clients or test runners without origin header
         return True
 
     try:
-        parsed = urlparse(origin_header)
-        hostname = (parsed.hostname or "").lower()
-        if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "testserver"):
-            return True
-        # Check against server host setting
-        if hostname == (settings.server_host or "").lower():
-            return True
+        origin = normalize_origin(origin_header)
+    except ValueError:
         return False
-    except Exception:
-        return False
+    if settings.allowed_origins_list:
+        return origin in settings.allowed_origins_list
+
+    # Local development stays convenient without turning the bind address
+    # (often 0.0.0.0) into a production browser-origin authorization rule.
+    parsed = urlparse(origin)
+    return (parsed.hostname or "").lower() in ("localhost", "127.0.0.1", "0.0.0.0", "testserver")
 
 
 def validate_ws_auth(

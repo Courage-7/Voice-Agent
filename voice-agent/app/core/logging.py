@@ -1,4 +1,4 @@
-"""Application logging configuration and structured log formatting."""
+﻿"""Application logging configuration and structured log formatting."""
 
 import logging
 import sys

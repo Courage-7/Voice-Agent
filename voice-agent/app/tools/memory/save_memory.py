@@ -1,4 +1,4 @@
-"""Tool to persist user memory and preferences."""
+﻿"""Tool to persist user memory and preferences."""
 
 from typing import Any, Dict
 

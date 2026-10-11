@@ -1,4 +1,4 @@
-"""Shared helper utilities for audio conversion, text cleanup, and formatting."""
+﻿"""Shared helper utilities for audio conversion, text cleanup, and formatting."""
 
 import re
 from typing import Any, Tuple

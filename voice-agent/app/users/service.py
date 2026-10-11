@@ -1,4 +1,4 @@
-"""User business logic service."""
+﻿"""User business logic service."""
 from typing import Optional
 from app.users.models import UserProfile
 from app.users.repository import user_repository

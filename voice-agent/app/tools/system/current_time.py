@@ -1,4 +1,4 @@
-"""System tool to retrieve current date, time, and timezone in spoken format."""
+﻿"""System tool to retrieve current date, time, and timezone in spoken format."""
 
 from datetime import datetime
 from typing import Any, Dict

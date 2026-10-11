@@ -1,4 +1,4 @@
-"""Voice session lifecycle and WebSocket streaming endpoints with authenticated identity validation."""
+﻿"""Voice session lifecycle and WebSocket streaming endpoints with authenticated identity validation."""
 
 import logging
 from typing import Optional
@@ -10,6 +10,7 @@ from app.auth.models import AuthUser
 from app.conversations.service import conversation_service
 from app.core.dependencies import get_current_user, is_allowed_origin, validate_ws_auth
 from app.realtime.session import RealtimeClientSession
+from app.users.service import user_service
 from app.voice.catalog import voice_catalog_service
 
 logger = logging.getLogger(__name__)
@@ -51,13 +52,25 @@ async def create_voice_session(
     session_id = str(uuid4())
     user_id = current_user.id
 
-    # Pre-register the conversation session under verified owner
-    conversation_service.get_or_create_session(session_id, user_id)
+    # A durable session must exist before the WebSocket is admitted.  The
+    # user row is created first because conversation_sessions has an owner FK.
+    await user_service.get_or_create_user(
+        user_id,
+        full_name=current_user.full_name or "User",
+        email=current_user.email or None,
+    )
 
     # Set user voice preference if provided
     selected_voice = None
     if payload.voice_model:
         selected_voice = voice_catalog_service.set_user_voice(user_id, payload.voice_model)
+
+    await conversation_service.create_session(
+        session_id,
+        user_id,
+        persona=payload.persona,
+        voice_model=selected_voice,
+    )
 
     logger.info(f"Voice session created: {session_id} for verified user {user_id} (voice: {selected_voice})")
     return SessionResponse(
@@ -81,7 +94,7 @@ async def get_voice_session(
     current_user: AuthUser = Depends(get_current_user),
 ):
     """Inspect an owned voice session's current state and message count."""
-    conv = conversation_service.get_session(session_id)
+    conv = await conversation_service.get_session_async(session_id, user_id=current_user.id)
     if not conv:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
 
@@ -113,17 +126,19 @@ async def end_voice_session(
     current_user: AuthUser = Depends(get_current_user),
 ):
     """Gracefully end an active voice session if owned by caller."""
-    conv = conversation_service.get_session(session_id)
+    conv = await conversation_service.get_session_async(session_id, user_id=current_user.id)
     if conv and conv.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied: session belongs to another user.")
 
     active_session = _active_sessions.pop(session_id, None)
     if active_session:
         await active_session.close()
+        await conversation_service.set_session_status(session_id, current_user.id, "ended")
         logger.info(f"Voice session ended via API: {session_id}")
         return {"success": True, "session_id": session_id, "status": "ended"}
 
     if conv:
+        await conversation_service.set_session_status(session_id, current_user.id, "ended")
         return {"success": True, "session_id": session_id, "status": "already_inactive"}
 
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
@@ -154,10 +169,12 @@ async def voice_agent_websocket(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # 3. Enforce session ownership
-    conv = conversation_service.get_session(session_id)
-    if conv and conv.user_id and conv.user_id != user.id:
-        logger.warning(f"Session ownership mismatch: session '{session_id}' owned by '{conv.user_id}', caller is '{user.id}'")
+    # 3. Hydrate through the authenticated user's RLS scope before accepting.
+    # The in-memory cache is intentionally bounded and is empty after a
+    # restart, so it cannot be the authority for session ownership.
+    conv = await conversation_service.get_session_async(session_id, user_id=user.id)
+    if not conv or conv.user_id != user.id:
+        logger.warning(f"Rejected WebSocket for unknown or unowned session '{session_id}' (caller={user.id})")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
@@ -170,6 +187,7 @@ async def voice_agent_websocket(
         voice_model=voice,
     )
     _active_sessions[session_id] = session
+    await conversation_service.set_session_status(session_id, user.id, "active")
 
     await session.start(subprotocol="shinra-auth" if ws_token else None)
 
@@ -188,3 +206,7 @@ async def voice_agent_websocket(
     finally:
         _active_sessions.pop(session_id, None)
         await session.close()
+        try:
+            await conversation_service.set_session_status(session_id, user.id, "ended")
+        except Exception:
+            logger.warning("Failed to persist WebSocket close for session %s", session_id)

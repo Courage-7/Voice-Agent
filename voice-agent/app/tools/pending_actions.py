@@ -1,4 +1,4 @@
-"""Pending Action Ledger & Write Authorization Gateway.
+﻿"""Pending Action Ledger & Write Authorization Gateway.
 
 Provides a trusted server-side store for proposed actions requiring user confirmation.
 Binds approval to exact validated arguments, user, session, and one-time execution.
@@ -55,6 +55,7 @@ class PendingAction:
 
 from datetime import datetime, timezone
 from app.db.session import db_gateway
+from app.core.config import settings
 
 class PendingActionStore:
     """Durable repository interface for pending actions (DB-backed when Neon PostgreSQL is connected)."""
@@ -77,6 +78,11 @@ class PendingActionStore:
                 for k in sorted_keys[: len(self._actions) - self._max_cache_size]:
                     self._actions.pop(k, None)
 
+    @staticmethod
+    def _require_persistence() -> None:
+        if settings.requires_persistent_storage and not db_gateway.is_connected:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use in-memory pending actions.")
+
     async def create(
         self,
         tool_name: str,
@@ -87,6 +93,7 @@ class PendingActionStore:
         ttl_seconds: float = DEFAULT_EXPIRY_SECONDS,
     ) -> PendingAction:
         """Register a new proposed action in the ledger."""
+        self._require_persistence()
         self._prune_expired_and_bounded()
         action_id = f"act_{uuid.uuid4().hex[:12]}"
         now = time.time()
@@ -138,10 +145,9 @@ class PendingActionStore:
 
     async def get(self, action_id: str, user_id: str) -> Optional[PendingAction]:
         """Retrieve a pending action from cache or owner-scoped PostgreSQL."""
-        action = self._actions.get(action_id)
-        if action and action.user_id != user_id:
-            return None
-        if not action and db_gateway.is_connected:
+        self._require_persistence()
+        action = None
+        if db_gateway.is_connected:
             row = await db_gateway.fetchrow_as_user(
                 user_id,
                 "SELECT * FROM pending_actions WHERE id = $1 AND user_id = $2",
@@ -165,25 +171,18 @@ class PendingActionStore:
                     state=data.get("state", "pending"),
                 )
                 self._actions[action_id] = action
+        else:
+            action = self._actions.get(action_id)
+            if action and action.user_id != user_id:
+                return None
         return action
 
     async def get_latest_for_session(
         self, session_id: str, user_id: str
     ) -> Optional[PendingAction]:
         """Retrieve most recent unconsumed and unexpired pending action for a session/user."""
+        self._require_persistence()
         now = time.time()
-        matching = [
-            a for a in self._actions.values()
-            if a.session_id == session_id
-            and a.user_id == user_id
-            and not a.consumed
-            and a.expires_at >= now
-            and a.state == "pending"
-        ]
-        if matching:
-            matching.sort(key=lambda x: x.created_at, reverse=True)
-            return matching[0]
-
         if db_gateway.is_connected:
             row = await db_gateway.fetchrow_as_user(
                 user_id,
@@ -207,6 +206,18 @@ class PendingActionStore:
                 )
                 self._actions[action.action_id] = action
                 return action
+        else:
+            matching = [
+                a for a in self._actions.values()
+                if a.session_id == session_id
+                and a.user_id == user_id
+                and not a.consumed
+                and a.expires_at >= now
+                and a.state == "pending"
+            ]
+            if matching:
+                matching.sort(key=lambda x: x.created_at, reverse=True)
+                return matching[0]
 
         return None
 
@@ -218,6 +229,7 @@ class PendingActionStore:
         expected_arguments: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, Optional[str], Optional[PendingAction]]:
         """Atomically validate and consume a pending action. Prevents replay and cross-user attacks."""
+        self._require_persistence()
         action = await self.get(action_id, user_id)
         if not action:
             return False, f"Pending action '{action_id}' not found.", None
@@ -278,6 +290,7 @@ class PendingActionStore:
 
     async def cancel(self, action_id: str, user_id: str, session_id: str = "") -> bool:
         """Mark a pending action as cancelled/rejected by user."""
+        self._require_persistence()
         action = await self.get(action_id, user_id)
         if not action or action.consumed:
             return False

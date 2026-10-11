@@ -1,4 +1,4 @@
-"""Central tool registry and policy engine for Voice AI Agent."""
+﻿"""Central tool registry and policy engine for Voice AI Agent."""
 
 import logging
 from typing import Any, Dict, List, Optional
@@ -111,6 +111,28 @@ class ToolRegistry:
             tools = [t for t in tools if t.name != "execute_app_action"]
         return [t.to_deepgram_schema() for t in tools]
 
+    def get_openai_tool_schemas(
+        self,
+        capabilities: Optional[List[str]] = None,
+        connected_apps: Optional[List[str]] = None,
+        include_meta_tools: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Export tool schemas formatted for Groq / OpenAI tool calling."""
+        tools = self.get_tools_for_capabilities(capabilities, connected_apps=connected_apps)
+        if not include_meta_tools:
+            tools = [t for t in tools if t.name != "execute_app_action"]
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters,
+                },
+            }
+            for t in tools
+        ]
+
     def get_metadata_catalog(self) -> List[Dict[str, Any]]:
         """Export complete tool contract metadata for permission, audit, and routing."""
         return [tool.get_metadata() for tool in self._tools.values()]
@@ -148,7 +170,8 @@ class ToolRegistry:
             }
 
         # 1. Server-side Confirmation Policy Check for Write / Destructive Actions (F02)
-        if tool.requires_confirmation:
+        requires_confirmation = tool.requires_confirmation_for(clean_args)
+        if requires_confirmation:
             if action_id:
                 # Validate and consume the exact pending action record
                 consumed_ok, err_msg, _ = await pending_action_store.consume(
@@ -194,13 +217,15 @@ class ToolRegistry:
                     "message": "Action paused pending user verbal confirmation.",
                 }
         else:
-            effective_confirmed = True
+            # Confirmation is meaningful only when the registry verified a
+            # pending action. Never manufacture it for dynamic tools.
+            effective_confirmed = False
 
         # 2. Execution with Error Boundary and Deduplication
         from app.tools.execution_ledger import execution_ledger
 
-        if tool.requires_confirmation:
-            recent = execution_ledger.find_recent_execution(tool_name, clean_args, user_id, window_seconds=10.0)
+        if requires_confirmation:
+            recent = await execution_ledger.find_recent_execution(tool_name, clean_args, user_id, window_seconds=10.0)
             if recent:
                 logger.info(f"Duplicate write execution prevented by ledger: {recent.receipt_id}")
                 return {
@@ -222,7 +247,7 @@ class ToolRegistry:
                 logger.warning(f"Tool '{tool_name}' returned unconfirmed failure: {result.get('error')}")
 
             # Record receipt in execution ledger
-            if tool.requires_confirmation or getattr(tool, "category", "") == "action":
+            if requires_confirmation or getattr(tool, "category", "") == "action":
                 status_str = "success" if result.get("success", False) else "failed"
                 await execution_ledger.record_execution(
                     tool_name=tool_name,
@@ -255,6 +280,8 @@ class ToolRegistry:
             title = args.get("title", "Event")
             start = args.get("start_time", "the requested time")
             return f"I am ready to schedule '{title}' for {start}. Would you like me to confirm this meeting?"
+        elif tool_name == "execute_app_action":
+            return f"I am ready to {args.get('intent', 'perform this action')} on {args.get('app_name', 'the connected app')}. Would you like me to proceed?"
         return f"I am ready to perform {tool_name}. Would you like me to proceed?"
 
     def _register_default_tools(self) -> None:

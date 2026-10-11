@@ -1,4 +1,4 @@
-"""System, health, and observability endpoints."""
+﻿"""System, health, and observability endpoints."""
 
 from fastapi import APIRouter, Response
 from fastapi.responses import PlainTextResponse

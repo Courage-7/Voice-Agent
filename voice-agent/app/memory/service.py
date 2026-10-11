@@ -1,8 +1,9 @@
-"""Memory service providing persistence, semantic retrieval, and structured extraction."""
+﻿"""Memory service providing persistence, semantic retrieval, and structured extraction."""
 
 import logging
 from typing import Dict, List, Optional
 
+from app.core.config import settings
 from app.db.session import db_gateway
 from app.memory.extractor import structured_extractor
 from app.memory.models import MemoryRecord
@@ -33,6 +34,11 @@ class MemoryService:
                 self._in_memory_store[rec.user_id] = [
                     r for r in self._in_memory_store[rec.user_id] if r.id != k
                 ]
+
+    @staticmethod
+    def _require_persistence() -> None:
+        if settings.requires_persistent_storage and not db_gateway.is_connected:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use in-memory memory state.")
 
     async def save_memory(
         self,
@@ -76,6 +82,8 @@ class MemoryService:
             except Exception as exc:
                 logger.exception("Failed to persist memory to Neon PostgreSQL")
                 raise RuntimeError(f"Database persistence failure: {exc}") from exc
+        else:
+            self._require_persistence()
 
         # Cache update only commits after authoritative database write succeeds
         if user_id not in self._in_memory_store:
@@ -96,6 +104,7 @@ class MemoryService:
         confidence: Optional[float] = None,
     ) -> Optional[MemoryRecord]:
         """Update an existing memory record by ID. Authoritative when database is connected."""
+        self._require_persistence()
         record = self._by_id.get(memory_id)
         if not record and not db_gateway.is_connected:
             return None
@@ -136,6 +145,7 @@ class MemoryService:
 
     async def delete_memory(self, memory_id: str, user_id: str) -> bool:
         """Delete a memory record by ID. Authoritative when database is connected."""
+        self._require_persistence()
         if db_gateway.is_connected:
             try:
                 await db_gateway.execute_as_user(user_id, "DELETE FROM memories WHERE id = $1", memory_id)
@@ -168,6 +178,7 @@ class MemoryService:
 
     async def search_memory(self, user_id: str, query: str, limit: int = 3) -> List[Dict[str, str]]:
         """Search relevant memories for a user, hydrating from Neon PostgreSQL if connected."""
+        self._require_persistence()
         if db_gateway.is_connected and user_id not in self._in_memory_store:
             try:
                 rows = await db_gateway.fetch_as_user(
@@ -190,6 +201,8 @@ class MemoryService:
                     self._in_memory_store[user_id] = db_records
             except Exception as e:
                 logger.warning(f"Failed to hydrate memories from Neon PostgreSQL for {user_id}: {e}")
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent memory lookup failed.") from e
 
         records = self._in_memory_store.get(user_id, [])
 

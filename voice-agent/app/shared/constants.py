@@ -1,4 +1,4 @@
-"""Shared constants across voice, agent, and audio modules."""
+﻿"""Shared constants across voice, agent, and audio modules."""
 
 DEFAULT_INPUT_SAMPLE_RATE = 16000
 DEFAULT_OUTPUT_SAMPLE_RATE = 24000

@@ -1,4 +1,4 @@
-"""Conversation models and turn records."""
+﻿"""Conversation models and turn records."""
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List

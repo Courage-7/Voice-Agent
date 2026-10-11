@@ -1,4 +1,4 @@
-"""Long-term memory and structured extraction endpoints with verified user isolation."""
+﻿"""Long-term memory and structured extraction endpoints with verified user isolation."""
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query

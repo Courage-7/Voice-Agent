@@ -1,4 +1,4 @@
-"""Composio OAuth integrations and action execution router with verified user identity."""
+﻿"""Composio OAuth integrations and action execution router with verified user identity."""
 
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query

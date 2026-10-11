@@ -1,4 +1,4 @@
-"""User profile and identity endpoints with tenant isolation."""
+﻿"""User profile and identity endpoints with tenant isolation."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth.models import AuthUser

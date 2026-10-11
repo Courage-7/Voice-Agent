@@ -1,4 +1,4 @@
-"""Conversations and call session transcript endpoints with authenticated tenant isolation."""
+﻿"""Conversations and call session transcript endpoints with authenticated tenant isolation."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth.models import AuthUser

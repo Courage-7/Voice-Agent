@@ -1,7 +1,7 @@
 """Groq LLM Client Adapter for ultra-low latency LPU inference."""
 
 import logging
-from typing import AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from app.core.config import settings
 
@@ -60,6 +60,59 @@ class GroqLLMClient:
         except Exception:
             logger.exception("Error in Groq streaming completion")
             yield " I ran into a brief hiccup while processing that."
+
+    async def chat_completion_with_tools(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        model: Optional[str] = None,
+        temperature: float = 0.2,
+    ) -> Dict[str, Any]:
+        """Invoke Groq with tool definitions and parse function calls."""
+        import json
+
+        selected_model = model or settings.groq_model
+        if not self._client:
+            if settings.demo_mode:
+                return {"content": "This is a demo response. Live reasoning is disabled.", "tool_calls": None}
+            raise RuntimeError("Groq is unavailable; no model response was generated.")
+
+        try:
+            kwargs: Dict[str, Any] = {
+                "model": selected_model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = "auto"
+
+            response = await self._client.chat.completions.create(**kwargs)
+            choice = response.choices[0]
+            message = choice.message
+
+            tool_calls_data = None
+            if getattr(message, "tool_calls", None):
+                tool_calls_data = []
+                for tc in message.tool_calls:
+                    args = {}
+                    try:
+                        args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+                    except Exception:
+                        pass
+                    tool_calls_data.append({
+                        "id": getattr(tc, "id", ""),
+                        "name": tc.function.name,
+                        "arguments": args,
+                    })
+
+            return {
+                "content": message.content or "",
+                "tool_calls": tool_calls_data,
+            }
+        except Exception:
+            logger.exception("Error in Groq chat completion with tools")
+            raise
 
 
 groq_client = GroqLLMClient()

@@ -1,4 +1,4 @@
-"""Central API router aggregating all versioned REST endpoints."""
+﻿"""Central API router aggregating all versioned REST endpoints."""
 
 from fastapi import APIRouter
 from app.api.v1.conversations import router as conversations_router

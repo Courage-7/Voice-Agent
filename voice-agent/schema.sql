@@ -25,7 +25,20 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Long-Term Semantic Memories Table
+-- 3. Durable Conversation Sessions
+CREATE TABLE IF NOT EXISTS public.conversation_sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'active', 'ended')),
+    voice_model TEXT,
+    persona TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    ended_at TIMESTAMPTZ
+);
+
+-- 4. Long-Term Semantic Memories Table
 CREATE TABLE IF NOT EXISTS public.memories (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -37,10 +50,10 @@ CREATE TABLE IF NOT EXISTS public.memories (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. Conversation Messages / Transcript Store
+-- 5. Conversation Messages / Transcript Store
 CREATE TABLE IF NOT EXISTS public.messages (
     id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES public.conversation_sessions(session_id) ON DELETE CASCADE,
     user_id TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content TEXT NOT NULL,
@@ -48,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. Pending Actions Store (Deterministic confirmation ledger)
+-- 6. Pending Actions Store (Deterministic confirmation ledger)
 CREATE TABLE IF NOT EXISTS public.pending_actions (
     id TEXT PRIMARY KEY,
     tool_name TEXT NOT NULL,
@@ -64,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.pending_actions (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 6. Execution Receipts / Ledger (Idempotency and deduplication)
+-- 7. Execution Receipts / Ledger (Idempotency and deduplication)
 CREATE TABLE IF NOT EXISTS public.execution_receipts (
     id TEXT PRIMARY KEY,
     action_id TEXT,
@@ -77,7 +90,7 @@ CREATE TABLE IF NOT EXISTS public.execution_receipts (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 7. Task Workflows & Checkpoints (Durable multi-step state)
+-- 8. Task Workflows & Checkpoints (Durable multi-step state)
 CREATE TABLE IF NOT EXISTS public.tasks (
     task_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -96,6 +109,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 -- 8. Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_memories_user_id ON public.memories(user_id);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON public.memories(category);
+CREATE INDEX IF NOT EXISTS idx_conversation_sessions_user_id ON public.conversation_sessions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_sessions_status ON public.conversation_sessions(status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON public.messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_messages_user_id ON public.messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_pending_actions_user_id ON public.pending_actions(user_id);
@@ -126,6 +141,8 @@ $$ LANGUAGE plpgsql STABLE;
 
 ALTER TABLE public.memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memories FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_sessions FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.pending_actions ENABLE ROW LEVEL SECURITY;
@@ -139,6 +156,12 @@ ALTER TABLE public.execution_receipts FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS user_isolation_memories ON public.memories;
 CREATE POLICY user_isolation_memories ON public.memories
+    FOR ALL
+    USING (user_id = public.current_app_user())
+    WITH CHECK (user_id = public.current_app_user());
+
+DROP POLICY IF EXISTS user_isolation_conversation_sessions ON public.conversation_sessions;
+CREATE POLICY user_isolation_conversation_sessions ON public.conversation_sessions
     FOR ALL
     USING (user_id = public.current_app_user())
     WITH CHECK (user_id = public.current_app_user());

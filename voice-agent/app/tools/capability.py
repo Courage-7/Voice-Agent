@@ -1,4 +1,4 @@
-"""Capability Resolver and Provider Disambiguation Engine.
+﻿"""Capability Resolver and Provider Disambiguation Engine.
 
 Resolves model-facing semantic requests (e.g. search_emails, create_calendar_event)
 to concrete connected provider toolkits (Gmail vs. Outlook; Google Calendar vs. Outlook)

@@ -1,4 +1,4 @@
-"""Database module for Neon Serverless PostgreSQL."""
+﻿"""Database module for Neon Serverless PostgreSQL."""
 
 from app.db.session import DatabaseGateway, db_gateway
 

@@ -1,4 +1,4 @@
-"""Structured memory extraction using LangChain and Groq."""
+﻿"""Structured memory extraction using LangChain and Groq."""
 
 import logging
 from typing import List, Optional

@@ -1,4 +1,4 @@
-"""Memory data models and schemas."""
+﻿"""Memory data models and schemas."""
 
 from datetime import datetime, timezone
 from uuid import uuid4

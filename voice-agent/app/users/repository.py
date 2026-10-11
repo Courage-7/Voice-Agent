@@ -1,8 +1,13 @@
-"""User repository with Neon PostgreSQL and in-memory caching."""
+﻿"""User repository with Neon PostgreSQL and in-memory caching."""
 
 from typing import Dict, Optional
+import logging
+
+from app.core.config import settings
 from app.db.session import db_gateway
 from app.users.models import UserProfile
+
+logger = logging.getLogger(__name__)
 
 
 class UserRepository:
@@ -14,10 +19,7 @@ class UserRepository:
         }
 
     async def get_by_id(self, user_id: str) -> Optional[UserProfile]:
-        """Fetch user by ID."""
-        if user_id in self._cache:
-            return self._cache[user_id]
-
+        """Fetch a user from the authoritative database when available."""
         if db_gateway.is_connected:
             try:
                 row = await db_gateway.fetchrow_as_user(user_id, "SELECT * FROM users WHERE id = $1", user_id)
@@ -25,10 +27,16 @@ class UserRepository:
                     user = UserProfile(**dict(row))
                     self._cache[user_id] = user
                     return user
-            except Exception:
-                pass
+                return None
+            except Exception as exc:
+                logger.warning("Failed to fetch user profile %s from PostgreSQL: %s", user_id, exc)
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent user lookup failed.") from exc
 
-        return None
+        if settings.requires_persistent_storage:
+            raise RuntimeError("Persistent storage is unavailable; refusing to use cached user data.")
+
+        return self._cache.get(user_id)
 
     async def save(self, user: UserProfile) -> UserProfile:
         """Save or update user profile."""
@@ -55,8 +63,12 @@ class UserRepository:
                     user.email,
                     user.metadata,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to save user profile %s to PostgreSQL: %s", user.id, exc)
+                if settings.requires_persistent_storage:
+                    raise RuntimeError("Persistent user save failed.") from exc
+        elif settings.requires_persistent_storage:
+            raise RuntimeError("Persistent storage is unavailable; refusing to cache a user write.")
         self._cache[user.id] = user
         return user
 

@@ -1,4 +1,4 @@
-"""Shared type definitions and data structures."""
+﻿"""Shared type definitions and data structures."""
 
 from typing import Any, Dict
 from pydantic import BaseModel, Field

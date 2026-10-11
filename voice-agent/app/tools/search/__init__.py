@@ -1,1 +1,1 @@
-"""Search tools package."""
+﻿"""Search tools package."""

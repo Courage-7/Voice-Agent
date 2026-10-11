@@ -1,4 +1,4 @@
-"""Tool schemas and catalog endpoint."""
+﻿"""Tool schemas and catalog endpoint."""
 
 from fastapi import APIRouter
 from app.tools.registry import tool_registry

@@ -1,4 +1,4 @@
-"""Email tools: Gmail and Outlook integrations via Composio."""
+﻿"""Email tools: Gmail and Outlook integrations via Composio."""
 
 from typing import Any, Dict, List, Optional
 from app.integrations.composio.client import composio_gateway

@@ -1,4 +1,4 @@
-"""Tool to confirm pending actions or resume multi-step complex workflows."""
+﻿"""Tool to confirm pending actions or resume multi-step complex workflows."""
 
 import logging
 from typing import Any, Dict, Optional

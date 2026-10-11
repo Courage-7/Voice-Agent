@@ -1,4 +1,4 @@
-"""User domain models."""
+﻿"""User domain models."""
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional

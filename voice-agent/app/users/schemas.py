@@ -1,4 +1,4 @@
-"""User request and response schemas."""
+﻿"""User request and response schemas."""
 
 from typing import Optional
 from pydantic import BaseModel

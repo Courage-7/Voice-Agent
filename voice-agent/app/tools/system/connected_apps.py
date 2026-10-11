@@ -1,4 +1,4 @@
-"""Tool to inspect active connected apps for the current user."""
+﻿"""Tool to inspect active connected apps for the current user."""
 
 import logging
 from typing import Any, Dict

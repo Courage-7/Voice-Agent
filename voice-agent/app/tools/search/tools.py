@@ -1,4 +1,4 @@
-"""Search and research tools: SerpAI and Perplexity AI via Composio OAuth."""
+﻿"""Search and research tools: SerpAI and Perplexity AI via Composio OAuth."""
 
 from typing import Any, Dict
 from app.integrations.composio.client import composio_gateway

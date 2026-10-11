@@ -1,4 +1,4 @@
-"""Authentication module exposing Clerk-verified application identities."""
+﻿"""Authentication module exposing Clerk-verified application identities."""
 
 from app.auth.clerk import clerk_verifier
 from app.auth.models import AuthUser

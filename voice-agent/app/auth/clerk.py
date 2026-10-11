@@ -1,4 +1,4 @@
-"""Clerk session-token verification for FastAPI routes and WebSockets."""
+﻿"""Clerk session-token verification for FastAPI routes and WebSockets."""
 
 import base64
 import json

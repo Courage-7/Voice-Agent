@@ -1,4 +1,4 @@
-"""Tool to search user memories and context."""
+﻿"""Tool to search user memories and context."""
 
 from typing import Any, Dict
 
