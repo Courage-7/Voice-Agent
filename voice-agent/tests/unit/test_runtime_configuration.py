@@ -1,6 +1,7 @@
 """Regression checks for release configuration and explicit simulation boundaries."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -11,9 +12,15 @@ from app.integrations.composio.client import ComposioGateway
 from app.integrations.llm.client import GroqLLMClient
 
 
+def build_settings(*args: Any, **kwargs: Any) -> Settings:
+    """Instantiate Settings with Pydantic-settings' supported env-file override."""
+    settings_factory: Any = Settings
+    return settings_factory(*args, **kwargs)
+
+
 def test_production_rejects_missing_configuration():
     with pytest.raises(ValidationError, match="Missing production settings"):
-        Settings(
+        build_settings(
             _env_file=None,
             environment="production",
         )
@@ -21,7 +28,7 @@ def test_production_rejects_missing_configuration():
 
 def test_configuration_errors_do_not_print_credentials():
     with pytest.raises(ValidationError) as error:
-        Settings(_env_file=None, environment="production", groq_api_key="private-value-not-for-logs")
+        build_settings(_env_file=None, environment="production", groq_api_key="private-value-not-for-logs")
     assert "private-value-not-for-logs" not in str(error.value)
 
 
@@ -29,7 +36,7 @@ def test_environment_overrides_dotenv(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
     env_file.write_text("GROQ_API_KEY=from-file\n", encoding="utf-8")
     monkeypatch.setenv("GROQ_API_KEY", "from-environment")
-    config = Settings(_env_file=env_file)
+    config = build_settings(_env_file=env_file)
     assert config.groq_api_key == "from-environment"
     assert "from-environment" not in repr(config)
 
@@ -44,7 +51,7 @@ def test_isolated_modes_ignore_local_dotenv(monkeypatch, mode):
 
 def test_production_requires_clerk_verification_key():
     with pytest.raises(ValidationError, match="CLERK_JWT_KEY or CLERK_JWKS_URL"):
-        Settings(
+        build_settings(
             _env_file=None, environment="production",
             deepgram_api_key="test", groq_api_key="test", composio_api_key="test",
         database_url="postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
@@ -55,7 +62,7 @@ def test_production_requires_clerk_verification_key():
 
 
 def test_production_accepts_complete_configuration():
-    config = Settings(
+    config = build_settings(
         _env_file=None, environment="production",
         deepgram_api_key="test", groq_api_key="test", composio_api_key="test",
         database_url="postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require",
@@ -80,11 +87,11 @@ def test_production_requires_matching_https_browser_origins():
         "clerk_jwks_url": "https://example.clerk.accounts.dev/.well-known/jwks.json",
     }
     with pytest.raises(ValidationError, match="ALLOWED_ORIGINS"):
-        Settings(**base)
+        build_settings(**base)
     with pytest.raises(ValidationError, match="HTTPS"):
-        Settings(**base, allowed_origins="http://app.example.com", clerk_authorized_parties="http://app.example.com")
+        build_settings(**base, allowed_origins="http://app.example.com", clerk_authorized_parties="http://app.example.com")
     with pytest.raises(ValidationError, match="overlap"):
-        Settings(**base, allowed_origins="https://app.example.com", clerk_authorized_parties="https://other.example.com")
+        build_settings(**base, allowed_origins="https://app.example.com", clerk_authorized_parties="https://other.example.com")
 
 
 def test_websocket_origin_policy_uses_explicit_origins(monkeypatch):
@@ -98,7 +105,7 @@ def test_websocket_origin_policy_uses_explicit_origins(monkeypatch):
 
 def test_decoupled_pipeline_is_the_safe_default():
     """Default voice requests use the integration-aware execution path."""
-    config = Settings(_env_file=None)
+    config = build_settings(_env_file=None)
     assert config.voice_pipeline_mode == "decoupled"
 
 

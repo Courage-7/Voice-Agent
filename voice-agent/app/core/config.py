@@ -160,7 +160,10 @@ def load_settings() -> Settings:
     # inherit local credentials from a developer's working directory.
     environment = os.environ.get("ENVIRONMENT", "development")
     if environment in ("production", "testing", "demo"):
-        return Settings(_env_file=None)
+        # pydantic-settings exposes this supported constructor argument at
+        # runtime, but the inherited Pydantic type signature omits it.
+        settings_factory: Any = Settings
+        return settings_factory(_env_file=None)
     return Settings()
 
 
