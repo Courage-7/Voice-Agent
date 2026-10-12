@@ -1,4 +1,4 @@
-﻿"""Voice session lifecycle and WebSocket streaming endpoints with authenticated identity validation."""
+"""Voice session lifecycle and WebSocket streaming endpoints with authenticated identity validation."""
 
 import logging
 from typing import Optional
@@ -126,12 +126,19 @@ async def end_voice_session(
     current_user: AuthUser = Depends(get_current_user),
 ):
     """Gracefully end an active voice session if owned by caller."""
+    active_session = _active_sessions.get(session_id)
+    if active_session and active_session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied: session belongs to another user.")
+
     conv = await conversation_service.get_session_async(session_id, user_id=current_user.id)
     if conv and conv.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied: session belongs to another user.")
 
-    active_session = _active_sessions.pop(session_id, None)
+    if not active_session and not conv:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+
     if active_session:
+        _active_sessions.pop(session_id, None)
         await active_session.close()
         await conversation_service.set_session_status(session_id, current_user.id, "ended")
         logger.info(f"Voice session ended via API: {session_id}")
@@ -187,11 +194,11 @@ async def voice_agent_websocket(
         voice_model=voice,
     )
     _active_sessions[session_id] = session
-    await conversation_service.set_session_status(session_id, user.id, "active")
-
-    await session.start(subprotocol="shinra-auth" if ws_token else None)
 
     try:
+        await conversation_service.set_session_status(session_id, user.id, "active")
+        await session.start(subprotocol="shinra-auth" if ws_token else None)
+
         while True:
             message = await websocket.receive()
             if "bytes" in message and message["bytes"]:

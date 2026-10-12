@@ -48,3 +48,40 @@ async def test_cross_user_isolation_uses_verified_clerk_subjects():
 
     assert client.get(f"/api/conversations/{session_b_id}", headers=headers_a).status_code == 403
     assert client.get(f"/api/conversations/{session_b_id}", headers=headers_b).status_code == 200
+
+
+async def test_end_voice_session_rejects_unowned_active_session():
+    from unittest.mock import AsyncMock, MagicMock
+    from app.api.v1.voice import _active_sessions
+
+    headers_a = {"Authorization": f"Bearer {create_test_token('user_alpha', 'alpha@shinra.internal')}"}
+    headers_b = {"Authorization": f"Bearer {create_test_token('user_beta', 'beta@shinra.internal')}"}
+    session_id = "session_active_alpha_123"
+
+    mock_session = MagicMock()
+    mock_session.user_id = "user_alpha"
+    mock_session.close = AsyncMock()
+
+    _active_sessions[session_id] = mock_session
+    try:
+        # User Beta attempts to end User Alpha's active session
+        resp_b = client.post(f"/api/voice/sessions/{session_id}/end", headers=headers_b)
+        assert resp_b.status_code == 403
+        assert "Access denied" in resp_b.json()["detail"]
+        assert session_id in _active_sessions
+        mock_session.close.assert_not_called()
+
+        # User Alpha successfully ends their own active session
+        resp_a = client.post(f"/api/voice/sessions/{session_id}/end", headers=headers_a)
+        assert resp_a.status_code == 200
+        assert resp_a.json()["status"] == "ended"
+        assert session_id not in _active_sessions
+        mock_session.close.assert_called_once()
+    finally:
+        _active_sessions.pop(session_id, None)
+
+
+def test_end_voice_session_rejects_missing_session():
+    headers_a = {"Authorization": f"Bearer {create_test_token('user_alpha', 'alpha@shinra.internal')}"}
+    resp = client.post("/api/voice/sessions/non_existent_session_999/end", headers=headers_a)
+    assert resp.status_code == 404
