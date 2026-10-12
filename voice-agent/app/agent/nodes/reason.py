@@ -1,11 +1,14 @@
 """Reason node: processes prompt and context using Groq LLM."""
 
+import logging
 from typing import Any, Dict, Optional
 from langchain_core.runnables import RunnableConfig
 from app.agent.persona.service import persona_service
 from app.agent.state import AgentState
 from app.integrations.llm.client import groq_client
 from app.tools.registry import tool_registry
+
+logger = logging.getLogger(__name__)
 
 
 async def reason_node(state: AgentState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
@@ -43,7 +46,7 @@ async def reason_node(state: AgentState, config: Optional[RunnableConfig] = None
                     }
             except Exception:
                 # If tool evaluation fails, fall back to streaming conversation directly
-                pass
+                logger.exception("Tool evaluation failed; falling back to streaming conversation directly")
 
     # Stream the conversational response
     on_token = None
