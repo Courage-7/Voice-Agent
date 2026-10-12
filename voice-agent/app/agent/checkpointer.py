@@ -35,7 +35,10 @@ class LangGraphCheckpointer:
             from psycopg.rows import dict_row
             from psycopg_pool import AsyncConnectionPool
 
-            pool = AsyncConnectionPool(
+            # The checkpointer officially supports an AsyncConnectionPool. The
+            # psycopg generic cannot infer dict_row from keyword arguments,
+            # so keep this third-party boundary explicitly dynamic.
+            pool: Any = AsyncConnectionPool(
                 conninfo=settings.database_url,
                 min_size=1,
                 max_size=5,

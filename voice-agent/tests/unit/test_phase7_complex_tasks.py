@@ -40,6 +40,7 @@ async def test_complex_task_execution_flow():
 
         assert state["status"] == "completed"
         assert state["current_step_index"] == len(state["steps"])
+        assert state["spoken_summary"] is not None
         assert "completed your task" in state["spoken_summary"].lower()
         assert mock_exec.call_count == 2
 
@@ -74,6 +75,7 @@ async def test_complex_task_confirmation_pause_and_resume():
         )
         task_id = state["task_id"]
         assert state["status"] == "awaiting_confirmation"
+        assert state["confirmation_proposal"] is not None
         assert "confirm" in state["confirmation_proposal"].lower()
 
         # 2. Resume task with confirmed=True
@@ -105,6 +107,7 @@ async def test_complex_task_cancellation_on_declined_confirmation():
             confirmed=False,
         )
         assert resumed_state["status"] == "failed"
+        assert resumed_state["spoken_summary"] is not None
         assert "cancelled" in resumed_state["spoken_summary"].lower()
 
 

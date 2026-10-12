@@ -1,7 +1,7 @@
 ﻿"""Complex task state schema for multi-step LangGraph orchestration."""
 
 from typing import Any, Dict, List, Optional
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class TaskStep(TypedDict):
@@ -11,6 +11,7 @@ class TaskStep(TypedDict):
     arguments: Dict[str, Any]
     status: str  # "pending", "in_progress", "completed", "failed", "requires_confirmation"
     result: Optional[Dict[str, Any]]
+    confirmation_action_id: NotRequired[str]
 
 
 class ComplexTaskState(TypedDict):
