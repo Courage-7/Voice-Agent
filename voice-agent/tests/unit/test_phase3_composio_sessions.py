@@ -87,6 +87,32 @@ async def test_actions_execute_only_through_the_user_session():
     assert not mock_client.tools.execute.called
 
 
+@pytest.mark.asyncio
+async def test_execute_action_logs_only_action_name_and_param_keys(caplog):
+    """Verify Composio action execution logs omit full params and entity_id for privacy."""
+    import logging
+
+    gateway = ComposioGateway(api_key="mock_key")
+    gateway._client = None  # test entry log without client
+
+    with caplog.at_level(logging.INFO):
+        await gateway.execute_action(
+            action_name="TEST_SEND_SECRET",
+            params={"token": "super-secret-token", "recipient": "bob@example.com"},
+            entity_id="user_sensitive_999",
+        )
+
+    log_messages = [r.message for r in caplog.records if "TEST_SEND_SECRET" in r.message]
+    assert len(log_messages) == 1
+    log_text = log_messages[0]
+    assert "TEST_SEND_SECRET" in log_text
+    assert "token" in log_text
+    assert "recipient" in log_text
+    assert "super-secret-token" not in log_text
+    assert "bob@example.com" not in log_text
+    assert "user_sensitive_999" not in log_text
+
+
 def test_deepgram_functions_are_server_owned_and_defer_writes():
     """Voice Agent schemas must prevent speculative external writes."""
     read_schema = SearchEmailsTool().to_deepgram_function_schema()

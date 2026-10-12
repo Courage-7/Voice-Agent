@@ -1,4 +1,4 @@
-﻿"""Composio integration client, OAuth connection manager, and action executor."""
+"""Composio integration client, OAuth connection manager, and action executor."""
 
 import asyncio
 import logging
@@ -393,7 +393,8 @@ class ComposioGateway:
         Direct tool execution is deliberately unsupported: a session is the
         boundary that owns user identity, selected accounts, and the audit log.
         """
-        logger.info(f"Executing Composio action '{action_name}' for entity '{entity_id}' with params: {params}")
+        param_keys = list(params.keys()) if isinstance(params, dict) else []
+        logger.info(f"Executing Composio action '{action_name}' with parameter keys: {param_keys}")
 
         if not self._client:
             # Missing configuration must produce unavailable/failure, never fabricated success (F04)
