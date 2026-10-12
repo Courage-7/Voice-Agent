@@ -1,7 +1,8 @@
 ﻿"""Central tool registry and policy engine for Voice AI Agent."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any, Dict, List, Optional, cast
 
 from app.tools.base import BaseTool
 from app.tools.calendar.tools import CreateCalendarEventTool, ListCalendarEventsTool
@@ -240,7 +241,16 @@ class ToolRegistry:
         try:
             logger.info(f"Executing tool '{tool_name}' (confirmed={effective_confirmed}, user={user_id}) with params: {safe_log_args}")
             merged_args = {**clean_args, **context}
-            result = await tool.execute(**merged_args)
+            # Tool arguments are defined by each tool's JSON schema, so a
+            # base-class method with arbitrary keyword arguments would be an
+            # inaccurate contract. Validate the dynamic boundary here.
+            execute = getattr(tool, "execute", None)
+            if not callable(execute):
+                raise TypeError(f"Tool '{tool_name}' has no executable handler.")
+            handler = cast(Callable[..., Awaitable[Dict[str, Any]]], execute)
+            result = await handler(**merged_args)
+            if not isinstance(result, dict):
+                raise TypeError(f"Tool '{tool_name}' returned a non-dictionary result.")
 
             # Never report success until the tool result confirms success
             if not result.get("success", False) and "error" in result:

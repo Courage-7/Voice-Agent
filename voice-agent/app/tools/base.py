@@ -1,6 +1,6 @@
 ﻿"""Base tool contract, metadata definitions, and policy abstractions."""
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Dict, Iterable, Tuple
 
 
@@ -19,11 +19,6 @@ class BaseTool(ABC):
     operations: Tuple[str, ...] = ()
     supported_connected_apps: Tuple[str, ...] = ()
     supports_parallel_execution: bool = True
-
-    @abstractmethod
-    async def execute(self, **kwargs: Any) -> Dict[str, Any]:
-        """Execute the tool with given arguments and return structured results."""
-        pass
 
     def get_metadata(self) -> Dict[str, Any]:
         """Return complete metadata descriptor for discovery, permission, and audit."""
