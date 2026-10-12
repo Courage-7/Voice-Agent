@@ -1,6 +1,5 @@
 """Voice Catalog and TTS Model Registry for Deepgram Flux & Aura-2 Voice Models."""
 
-import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel

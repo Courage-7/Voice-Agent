@@ -77,6 +77,7 @@ async def test_explicit_provider_must_belong_to_authenticated_user():
         provider, error = await capability_resolver.resolve_email_provider("user-1", requested_provider="gmail")
 
     assert provider is None
+    assert error is not None
     assert error["status"] == "connection_unavailable"
 
 

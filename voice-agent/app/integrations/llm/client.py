@@ -1,7 +1,7 @@
 """Groq LLM Client Adapter for ultra-low latency LPU inference."""
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, cast
 
 from app.core.config import settings
 
@@ -47,9 +47,11 @@ class GroqLLMClient:
             return
 
         try:
+            from groq.types.chat import ChatCompletionMessageParam
+
             response = await self._client.chat.completions.create(
                 model=selected_model,
-                messages=messages,
+                messages=cast(List[ChatCompletionMessageParam], messages),
                 temperature=temperature,
                 stream=True,
             )

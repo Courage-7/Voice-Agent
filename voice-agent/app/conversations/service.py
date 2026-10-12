@@ -1,6 +1,7 @@
 ﻿"""Conversation recording and logging service."""
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.conversations.models import ConversationMessage, ConversationSession
@@ -123,13 +124,17 @@ class ConversationService:
                 )
                 for r in rows:
                     row_dict = dict(r)
+                    message_id = row_dict.get("id")
+                    created_at = row_dict.get("created_at")
+                    if not isinstance(message_id, str) or not isinstance(created_at, datetime):
+                        raise RuntimeError("Conversation message row has invalid persisted fields.")
                     session.messages.append(
                         ConversationMessage(
-                            id=row_dict.get("id"),
+                            id=message_id,
                             role=row_dict.get("role", "user"),
                             content=row_dict.get("content", ""),
                             metadata=row_dict.get("metadata") or {},
-                            timestamp=row_dict.get("created_at"),
+                            timestamp=created_at,
                         )
                     )
                 self._sessions[session_id] = session

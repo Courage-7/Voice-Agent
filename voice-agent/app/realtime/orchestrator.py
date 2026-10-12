@@ -23,6 +23,7 @@ from app.memory.service import memory_service
 from app.observability.metrics import metrics_collector
 from app.realtime.state import SessionState
 from app.shared.utils import clean_voice_text, extract_dual_stream_tags
+from app.users.models import UserProfile
 from app.users.service import user_service
 from app.voice.catalog import voice_catalog_service
 
@@ -127,7 +128,7 @@ class DualStreamVoiceOrchestrator:
 
         if isinstance(mem_res, str):
             self._memory_summary = mem_res
-        if profile_res and not isinstance(profile_res, Exception):
+        if isinstance(profile_res, UserProfile):
             if profile_res.full_name and profile_res.full_name not in ("User", "default_user"):
                 self._user_name = profile_res.full_name.strip().split()[0]
                 self._user_context_str = f"User Name: {profile_res.full_name}\nUser ID: {self.user_id}"

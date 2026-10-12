@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from app.core.config import settings
 
@@ -46,8 +46,8 @@ class StructuredMemoryExtractor:
             from langchain_groq import ChatGroq
 
             llm = ChatGroq(
-                api_key=self.api_key,
-                model_name=settings.groq_fast_model,  # Use fast 8B model for extraction
+                api_key=SecretStr(self.api_key),
+                model=settings.groq_fast_model,
                 temperature=0.1,
             )
             structured_llm = llm.with_structured_output(ConversationMemoryExtraction)

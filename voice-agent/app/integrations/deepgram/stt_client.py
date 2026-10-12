@@ -42,7 +42,7 @@ class DeepgramLiveSTTClient:
         self.on_utterance_end = on_utterance_end
         self.on_error = on_error
 
-        self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self.ws: Optional[websockets.ClientConnection] = None
         self._receive_task: Optional[asyncio.Task] = None
         self._is_running = False
 
@@ -88,8 +88,11 @@ class DeepgramLiveSTTClient:
 
     async def _receive_loop(self) -> None:
         """Receive transcripts and VAD control messages from Deepgram."""
+        ws = self.ws
+        if ws is None:
+            return
         try:
-            async for message in self.ws:
+            async for message in ws:
                 if isinstance(message, str):
                     data = json.loads(message)
                     await self._handle_message(data)
@@ -155,4 +158,3 @@ class DeepgramLiveSTTClient:
                 pass
             self.ws = None
         logger.info(f"[{self.session_id}] Deepgram Live STT closed.")
-
