@@ -63,7 +63,7 @@ async def create_voice_session(
     # Set user voice preference if provided
     selected_voice = None
     if payload.voice_model:
-        selected_voice = voice_catalog_service.set_user_voice(user_id, payload.voice_model)
+        selected_voice = await voice_catalog_service.set_user_voice_async(user_id, payload.voice_model)
 
     await conversation_service.create_session(
         session_id,

@@ -1,4 +1,4 @@
-﻿"""Voice Catalog and TTS Model Registry for Deepgram Flux & Aura-2 Voice Models."""
+"""Voice Catalog and TTS Model Registry for Deepgram Flux & Aura-2 Voice Models."""
 
 import asyncio
 import logging
@@ -199,15 +199,9 @@ class VoiceCatalogService:
         return validated
 
     def set_user_voice(self, user_id: str, voice_model: str) -> str:
-        """Save a validated voice preference for a user (sync cache + background DB persist)."""
+        """Save a validated voice preference for a user in memory."""
         validated = self.validate_voice(voice_model)
         _USER_VOICE_PREFERENCES[user_id] = validated
-        try:
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                loop.create_task(self.set_user_voice_async(user_id, validated))
-        except RuntimeError:
-            pass
         logger.info(f"Updated voice preference for user '{user_id}' to '{validated}'.")
         return validated
 

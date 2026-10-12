@@ -80,3 +80,18 @@ def test_normalize_for_speech_bullets_including_unicode():
     raw_text = "Key updates:\n• First item\n- Second item\n* Third item"
     expected = "Key updates:\nFirst item\nSecond item\nThird item"
     assert normalize_for_speech(raw_text) == expected
+
+
+@pytest.mark.asyncio
+async def test_create_voice_session_propagates_persistence_failure():
+    """Verify create_voice_session awaits set_user_voice_async and propagates persistence errors."""
+    from app.api.v1.voice import CreateSessionRequest, create_voice_session
+    from app.auth.models import AuthUser
+
+    user = AuthUser(id="user_err_test", email="test@example.com")
+    req = CreateSessionRequest(voice_model="aura-2-arcas-en")
+
+    with patch("app.api.v1.voice.voice_catalog_service.set_user_voice_async", new_callable=AsyncMock) as mock_set:
+        mock_set.side_effect = RuntimeError("Failed to persist voice preference to database.")
+        with pytest.raises(RuntimeError, match="Failed to persist voice preference to database."):
+            await create_voice_session(payload=req, current_user=user)
