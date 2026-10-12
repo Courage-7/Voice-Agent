@@ -71,3 +71,12 @@ async def test_realtime_client_session_handles_update_speak():
     await session._handle_client_event({"type": "UpdateSpeak", "voice": "aura-2-perseus-en"})
     assert session.deepgram_session.update_speak.called
     assert session.deepgram_session.update_speak.call_args[0][0] == "aura-2-perseus-en"
+
+
+def test_normalize_for_speech_bullets_including_unicode():
+    """Verify normalize_for_speech strips standard hyphens, asterisks, and Unicode • bullets."""
+    from app.integrations.deepgram.text import normalize_for_speech
+
+    raw_text = "Key updates:\n• First item\n- Second item\n* Third item"
+    expected = "Key updates:\nFirst item\nSecond item\nThird item"
+    assert normalize_for_speech(raw_text) == expected

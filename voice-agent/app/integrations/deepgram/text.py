@@ -1,4 +1,4 @@
-﻿"""Presentation-safe text normalization for Deepgram voice events."""
+"""Presentation-safe text normalization for Deepgram voice events."""
 
 import re
 
@@ -13,7 +13,7 @@ def normalize_for_speech(text: str) -> str:
     cleaned = re.sub(r'`([^`]+)`', r'\1', cleaned)
     cleaned = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)
     cleaned = re.sub(r'^#{1,6}\s+', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^\s*[-*â€¢]\s+', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^\s*[-*•]\s+', '', cleaned, flags=re.MULTILINE)
     cleaned = re.sub(r'\$\$(.*?)\$\$', r'\1', cleaned, flags=re.DOTALL)
     cleaned = re.sub(r'\$(.*?)\$', r'\1', cleaned)
     cleaned = re.sub(r'\\\[(.*?)\\\]', r'\1', cleaned, flags=re.DOTALL)
