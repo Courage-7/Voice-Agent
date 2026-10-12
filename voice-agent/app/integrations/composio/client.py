@@ -41,7 +41,8 @@ class ComposioGateway:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.composio_api_key
-        self._client = None
+        # The gateway boundary also accepts mock SDK clients in tests.
+        self._client: Any = None
         self._initialization_error: Optional[str] = None
         self._auth_configs_cache: Dict[str, str] = {}
         self._connected_accounts_cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
@@ -76,12 +77,15 @@ class ComposioGateway:
 
     def _list_auth_configs_sync(self) -> List[Any]:
         """Read all enabled project configs; a lookup failure is not an empty project."""
+        client = self._client
+        if client is None:
+            raise RuntimeError("Composio client is unavailable.")
         configs: List[Any] = []
         query: Dict[str, Any] = {"limit": 100, "show_disabled": False}
         seen_cursors: set[str] = set()
         try:
             while True:
-                page = self._client.auth_configs.list(**query)
+                page = client.auth_configs.list(**query)
                 items = page if isinstance(page, (list, tuple)) else _field(page, "items", _field(page, "data", []))
                 if not isinstance(items, (list, tuple)):
                     raise ValueError("Unexpected Composio auth config response")
@@ -355,7 +359,8 @@ class ComposioGateway:
 
     async def disconnect_account(self, connection_id: str, entity_id: str) -> Dict[str, Any]:
         """Revoke an integrated account only when it belongs to the verified entity."""
-        if not self._client:
+        client = self._client
+        if client is None:
             return {"success": False, "status": "unavailable", "error": "Composio is unavailable. No connection was removed."}
 
         try:
@@ -368,11 +373,9 @@ class ComposioGateway:
                     "error": "The connection does not belong to the authenticated user.",
                 }
 
-            if hasattr(self._client.connected_accounts, "delete"):
-                try:
-                    await asyncio.to_thread(self._client.connected_accounts.delete, connection_id)
-                except TypeError:
-                    await asyncio.to_thread(self._client.connected_accounts.delete, connected_account_id=connection_id)
+            # The current Composio SDK takes the account's nanoid as its sole
+            # positional argument (per the official connected-accounts docs).
+            await asyncio.to_thread(client.connected_accounts.delete, connection_id)
             self.invalidate_connected_accounts(entity_id)
             return {"success": True, "message": f"Connection '{connection_id}' successfully removed."}
         except Exception as e:

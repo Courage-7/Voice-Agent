@@ -107,6 +107,7 @@ async def test_engine_single_execution_gateway_with_confirmation():
                 user_id="user_ssot_test",
             )
             assert state["status"] == "awaiting_confirmation"
+            assert state["confirmation_proposal"] is not None
             assert "confirm" in state["confirmation_proposal"].lower()
             assert len(step_calls) == 2
 
@@ -192,4 +193,3 @@ def test_dynamic_app_hydration_in_deepgram_schemas():
     )
     names_notion = {s["name"] for s in schemas_notion}
     assert "execute_app_action" in names_notion
-
